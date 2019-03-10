@@ -31,7 +31,6 @@
 #include "cl_editor.h"
 #include "cl_command_event.h"
 #include <wx/event.h>
-#include "CompileCommandsCreateor.h"
 #include "CxxPreProcessorThread.h"
 #include "CxxPreProcessorCache.h"
 #include "CxxUsingNamespaceCollectorThread.h"
@@ -119,6 +118,7 @@ public:
     void GotoImpl(clEditor* editor);
     void GotoDecl(clEditor* editor);
     bool GetDefinitionsAndSearchPaths(clEditor* editor, wxArrayString& searchPaths, wxArrayString& definitions);
+    void UpdateParserPaths();
 };
 
 #endif // CODECOMPLETIONMANAGER_H

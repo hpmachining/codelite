@@ -154,7 +154,7 @@ DiffSideBySidePanelBase::DiffSideBySidePanelBase(wxWindow* parent, wxWindowID id
     boxSizer111->Add(boxSizer310, 1, wxEXPAND, WXC_FROM_DIP(0));
 
     m_stcLeft = new wxStyledTextCtrl(m_splitterPageLeft, wxID_ANY, wxDefaultPosition,
-                                     wxDLG_UNIT(m_splitterPageLeft, wxSize(-1, -1)), 0);
+                                     wxDLG_UNIT(m_splitterPageLeft, wxSize(500, 300)), 0);
     // Configure the fold margin
     m_stcLeft->SetMarginType(4, wxSTC_MARGIN_SYMBOL);
     m_stcLeft->SetMarginMask(4, wxSTC_MASK_FOLDERS);
@@ -488,7 +488,7 @@ NotebookNavigationDlgBase::NotebookNavigationDlgBase(wxWindow* parent, wxWindowI
                                             wxTAB_TRAVERSAL | wxBORDER_STATIC);
     m_dvListCtrl->SetFocus();
 
-    boxSizer163->Add(m_dvListCtrl, 1, wxALL | wxEXPAND, WXC_FROM_DIP(2));
+    boxSizer163->Add(m_dvListCtrl, 1, wxEXPAND, WXC_FROM_DIP(2));
 
     m_dvListCtrl->AppendTextColumn(_("Modified"), wxDATAVIEW_CELL_INERT, WXC_FROM_DIP(30), wxALIGN_CENTER,
                                    wxDATAVIEW_COL_RESIZABLE);
@@ -706,22 +706,52 @@ clEditorBarBase::clEditorBarBase(wxWindow* parent, wxWindowID id, const wxPoint&
         bBitmapLoaded = true;
     }
 
+    wxBoxSizer* boxSizer346 = new wxBoxSizer(wxHORIZONTAL);
+    this->SetSizer(boxSizer346);
+
+    wxFlexGridSizer* flexGridSizer374 = new wxFlexGridSizer(0, 3, 0, 0);
+    flexGridSizer374->SetFlexibleDirection(wxBOTH);
+    flexGridSizer374->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
+
+    boxSizer346->Add(flexGridSizer374, 1, wxEXPAND, WXC_FROM_DIP(5));
+
+    m_buttonScope =
+        new clThemedButton(this, wxID_ANY, wxT(""), wxDefaultPosition, wxDLG_UNIT(this, wxSize(200, -1)), 0);
+
+    flexGridSizer374->Add(m_buttonScope, 1, wxRIGHT | wxEXPAND, WXC_FROM_DIP(5));
+
+    m_buttonFilePath =
+        new clThemedButton(this, wxID_ANY, wxT(""), wxDefaultPosition, wxDLG_UNIT(this, wxSize(200, -1)), 0);
+
+    flexGridSizer374->Add(m_buttonFilePath, 1, wxEXPAND, WXC_FROM_DIP(5));
+
+    m_buttonBookmarks =
+        new clThemedButton(this, wxID_ANY, wxT(""), wxDefaultPosition, wxDLG_UNIT(this, wxSize(200, -1)), 0);
+
+    flexGridSizer374->Add(m_buttonBookmarks, 0, wxLEFT, WXC_FROM_DIP(5));
+
     SetName(wxT("clEditorBarBase"));
     SetSize(wxDLG_UNIT(this, wxSize(-1, -1)));
     if(GetSizer()) { GetSizer()->Fit(this); }
     // Connect events
-    this->Connect(wxEVT_PAINT, wxPaintEventHandler(clEditorBarBase::OnPaint), NULL, this);
-    this->Connect(wxEVT_ERASE_BACKGROUND, wxEraseEventHandler(clEditorBarBase::OnEraseBG), NULL, this);
     this->Connect(wxEVT_SIZE, wxSizeEventHandler(clEditorBarBase::OnEditorSize), NULL, this);
-    this->Connect(wxEVT_LEFT_DOWN, wxMouseEventHandler(clEditorBarBase::OnLeftDown), NULL, this);
+    m_buttonScope->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(clEditorBarBase::OnButtonScope), NULL,
+                           this);
+    m_buttonFilePath->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(clEditorBarBase::OnButtonActions),
+                              NULL, this);
+    m_buttonBookmarks->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(clEditorBarBase::OnButtonBookmarks),
+                               NULL, this);
 }
 
 clEditorBarBase::~clEditorBarBase()
 {
-    this->Disconnect(wxEVT_PAINT, wxPaintEventHandler(clEditorBarBase::OnPaint), NULL, this);
-    this->Disconnect(wxEVT_ERASE_BACKGROUND, wxEraseEventHandler(clEditorBarBase::OnEraseBG), NULL, this);
     this->Disconnect(wxEVT_SIZE, wxSizeEventHandler(clEditorBarBase::OnEditorSize), NULL, this);
-    this->Disconnect(wxEVT_LEFT_DOWN, wxMouseEventHandler(clEditorBarBase::OnLeftDown), NULL, this);
+    m_buttonScope->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(clEditorBarBase::OnButtonScope), NULL,
+                              this);
+    m_buttonFilePath->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(clEditorBarBase::OnButtonActions),
+                                 NULL, this);
+    m_buttonBookmarks->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED,
+                                  wxCommandEventHandler(clEditorBarBase::OnButtonBookmarks), NULL, this);
 }
 
 clTableLineEditorBaseDlg::clTableLineEditorBaseDlg(wxWindow* parent, wxWindowID id, const wxString& title,

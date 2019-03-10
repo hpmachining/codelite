@@ -5,11 +5,12 @@
 #include "lexer_configuration.h"
 #include <wx/settings.h>
 #include "cl_config.h"
+#include "clSystemSettings.h"
 
 #ifdef __WXMSW__
-#define LIST_STYLE wxDV_ROW_LINES | wxDV_ENABLE_SEARCH | wxBORDER_SIMPLE
+#define LIST_STYLE wxDV_ROW_LINES | wxDV_ENABLE_SEARCH | wxBORDER_NONE
 #else
-#define LIST_STYLE wxDV_ROW_LINES | wxDV_ENABLE_SEARCH | wxBORDER_THEME
+#define LIST_STYLE wxDV_ROW_LINES | wxDV_ENABLE_SEARCH | wxBORDER_NONE
 #endif
 
 clThemedListCtrl::clThemedListCtrl(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style)
@@ -40,7 +41,7 @@ void clThemedListCtrl::ApplyTheme()
     LexerConf::Ptr_t lexer = ColoursAndFontsManager::Get().GetLexer("text");
     clColours colours;
     if(lexer->IsDark()) {
-        colours.InitFromColour(wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
+        colours.InitFromColour(clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
     } else {
         colours.InitDefaults();
     }
@@ -51,19 +52,23 @@ void clThemedListCtrl::ApplyTheme()
         baseColour = clConfig::Get().Read("BaseColour", baseColour);
         colours.InitFromColour(baseColour);
     }
-
-    wxColour highlightColur = wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT);
-    wxColour textColour = wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT);
+    
+    // Set the built-in search colours
+    wxColour highlightColur = clSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT);
+    wxColour textColour = clSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT);
     colours.SetMatchedItemBgText(highlightColur);
     colours.SetMatchedItemText(textColour);
-    colours.SetSelItemBgColour(wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT));
+    
+    // When not using custom colours, use system defaults
+    if(!useCustomColour) {
+        colours.SetSelItemBgColour(clSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT));
 #ifdef __WXOSX__
-    colours.SetSelItemBgColourNoFocus(wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT));
+        colours.SetSelItemBgColourNoFocus(clSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT));
 #else
-    colours.SetSelItemBgColourNoFocus(colours.GetSelItemBgColour().ChangeLightness(110));
+        colours.SetSelItemBgColourNoFocus(colours.GetSelItemBgColour().ChangeLightness(110));
 #endif
-#if 0
-    if(!colours.IsLightTheme()) { colours.SetAlternateColour(colours.GetBgColour()); }
-#endif
+    }
+    // When using custom bg colour, don't use native drawings
+    this->SetNativeTheme(!useCustomColour);
     this->SetColours(colours);
 }

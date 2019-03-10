@@ -26,39 +26,21 @@
 #include "CompileCommandsCreateor.h"
 #include "event_notifier.h"
 #include "workspace.h"
+#include "file_logger.h"
+#include "asyncprocess.h"
+#include "globals.h"
 
 wxDEFINE_EVENT(wxEVT_COMPILE_COMMANDS_JSON_GENERATED, clCommandEvent);
 
-CompileCommandsCreateor::CompileCommandsCreateor(const wxFileName& path)
+CompileCommandsCreateor::CompileCommandsCreateor(const wxFileName& path, const wxString& config)
     : m_filename(path)
+    , m_configName(config)
 {
 }
 
-CompileCommandsCreateor::~CompileCommandsCreateor()
-{
-}
+CompileCommandsCreateor::~CompileCommandsCreateor() {}
 
 void CompileCommandsCreateor::Process(wxThread* thread)
 {
-    wxString errMsg;
     wxUnusedVar(thread);
-    clCxxWorkspace workspace;
-    workspace.OpenReadOnly(m_filename.GetFullPath(), errMsg);
-    
-    JSONRoot json(cJSON_Array);
-    JSONElement compile_commands = json.toElement();
-    workspace.CreateCompileCommandsJSON(compile_commands);
-    
-    // Save the file
-    wxFileName compileCommandsFile(m_filename.GetPath(), "compile_commands.json");
-    compileCommandsFile.AppendDir(".codelite");
-    
-    // Make sure that the folder exists
-    compileCommandsFile.Mkdir(wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL);
-    
-    // Save the file
-    json.save( compileCommandsFile );
-    
-    clCommandEvent eventCompileCommandsGenerated(wxEVT_COMPILE_COMMANDS_JSON_GENERATED);
-    EventNotifier::Get()->AddPendingEvent( eventCompileCommandsGenerated );
 }

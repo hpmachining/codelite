@@ -19,7 +19,7 @@
    "border": 0,
    "gbSpan": ",",
    "gbPosition": ",",
-   "m_styles": ["wxTAB_TRAVERSAL", "wxTRANSPARENT_WINDOW", "wxBORDER_THEME"],
+   "m_styles": ["wxTAB_TRAVERSAL", "wxTRANSPARENT_WINDOW", "wxBORDER_NONE"],
    "m_sizerFlags": [],
    "m_properties": [{
      "type": "string",
@@ -130,7 +130,7 @@
      "m_children": [{
        "m_type": 4461,
        "proportion": 0,
-       "border": 2,
+       "border": 0,
        "gbSpan": "1,1",
        "gbPosition": "0,0",
        "m_styles": ["wxTB_NODIVIDER", "wxTB_FLAT"],
@@ -185,7 +185,7 @@
       }, {
        "m_type": 4403,
        "proportion": 1,
-       "border": 5,
+       "border": 0,
        "gbSpan": "1,1",
        "gbPosition": "0,0",
        "m_styles": [],
@@ -391,11 +391,11 @@
           }, {
            "type": "string",
            "m_label": "Class Name:",
-           "m_value": ""
+           "m_value": "clThemedButton"
           }, {
            "type": "string",
            "m_label": "Include File:",
-           "m_value": ""
+           "m_value": "clThemedButton.h"
           }, {
            "type": "string",
            "m_label": "Style:",
@@ -500,11 +500,11 @@
           }, {
            "type": "string",
            "m_label": "Class Name:",
-           "m_value": ""
+           "m_value": "clThemedButton"
           }, {
            "type": "string",
            "m_label": "Include File:",
-           "m_value": ""
+           "m_value": "clThemedButton.h"
           }, {
            "type": "string",
            "m_label": "Style:",
@@ -609,11 +609,11 @@
           }, {
            "type": "string",
            "m_label": "Class Name:",
-           "m_value": ""
+           "m_value": "clThemedButton"
           }, {
            "type": "string",
            "m_label": "Include File:",
-           "m_value": ""
+           "m_value": "clThemedButton.h"
           }, {
            "type": "string",
            "m_label": "Style:",
@@ -826,11 +826,11 @@
           }, {
            "type": "string",
            "m_label": "Class Name:",
-           "m_value": ""
+           "m_value": "clThemedButton"
           }, {
            "type": "string",
            "m_label": "Include File:",
-           "m_value": ""
+           "m_value": "clThemedButton.h"
           }, {
            "type": "string",
            "m_label": "Style:",
@@ -935,11 +935,11 @@
           }, {
            "type": "string",
            "m_label": "Class Name:",
-           "m_value": ""
+           "m_value": "clThemedButton"
           }, {
            "type": "string",
            "m_label": "Include File:",
-           "m_value": ""
+           "m_value": "clThemedButton.h"
           }, {
            "type": "string",
            "m_label": "Style:",

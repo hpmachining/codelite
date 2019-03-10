@@ -71,6 +71,7 @@
 #include <wx/textdlg.h>
 #include <wx/wupdlock.h>
 #include <wx/xrc/xmlres.h>
+#include "clThemeUpdater.h"
 
 BEGIN_EVENT_TABLE(SubversionView, SubversionPageBase)
 EVT_UPDATE_UI(XRCID("svn_stop"), SubversionView::OnStopUI)
@@ -149,6 +150,8 @@ SubversionView::SubversionView(wxWindow* parent, Subversion2* plugin)
     , m_fileExplorerLastBaseImgIdx(-1)
     , m_codeliteEcho(NULL)
 {
+    clThemeUpdater::Get().RegisterWindow(m_splitter);
+    
     m_dvListCtrl->SetBitmaps(clGetManager()->GetStdIcons()->GetStandardMimeBitmapListPtr());
     m_dvListCtrlUnversioned->SetBitmaps(clGetManager()->GetStdIcons()->GetStandardMimeBitmapListPtr());
 
@@ -179,6 +182,7 @@ SubversionView::SubversionView(wxWindow* parent, Subversion2* plugin)
 
 SubversionView::~SubversionView()
 {
+    clThemeUpdater::Get().UnRegisterWindow(m_splitter);
     wxDELETE(m_themeHelper);
     DisconnectEvents();
 }
@@ -432,7 +436,7 @@ int SubversionView::DoGetIconIndex(const wxString& filename)
 
 void SubversionView::CreateFileMenu(wxMenu* menu)
 {
-    menu->Append(XRCID("svn_open_file"), _("Open File..."));
+    menu->Append(XRCID("svn_open_file"), _("Open File"));
     menu->AppendSeparator();
     menu->Append(XRCID("svn_file_update"), wxT("Update"));
     menu->Append(XRCID("svn_file_commit"), wxT("Commit"));
@@ -1144,7 +1148,7 @@ void SubversionView::DoRootDirChanged(const wxString& path)
 {
     if(path == wxEmptyString) {
         DoChangeRootPathUI(path);
-
+        UpdateStatusBar("");
     } else {
 
         // If a workspace is opened, set this new path to the workspace
@@ -1163,10 +1167,16 @@ void SubversionView::DoRootDirChanged(const wxString& path)
         }
         DoChangeRootPathUI(path);
         BuildTree();
+        UpdateStatusBar(path);
+    }
+}
 
-        // Clear the source control image
-        clStatusBar* sb = clGetManager()->GetStatusBar();
-        if(sb) {
+void SubversionView::UpdateStatusBar(const wxString& path)
+{
+    // Clear the source control image
+    clStatusBar* sb = clGetManager()->GetStatusBar();
+    if(sb) {
+        if(m_plugin->IsPathUnderSvn(path)) {
             wxBitmap bmp = clGetManager()->GetStdIcons()->LoadBitmap("subversion");
             sb->SetSourceControlBitmap(bmp, "Svn", _("Using Subversion\nClick to open the Subversion view"));
         }
@@ -1219,8 +1229,8 @@ void SubversionView::FinishDiff(wxString output, wxFileName fileBeingDiffed)
 
     DiffSideBySidePanel::FileInfo l(leftFile, title_left, true);
     DiffSideBySidePanel::FileInfo r(rightFile, title_right, false);
-    clDiffFrame* diffView = new clDiffFrame(EventNotifier::Get()->TopFrame(), l, r, true);
-    diffView->Show();
+    clDiffFrame diffView(EventNotifier::Get()->TopFrame(), l, r, true);
+    diffView.ShowModal();
     wxDELETE(m_codeliteEcho);
 }
 void SubversionView::OnSciStcChange(wxStyledTextEvent& event)
@@ -1231,11 +1241,16 @@ void SubversionView::OnSciStcChange(wxStyledTextEvent& event)
 
 void SubversionView::OnCloseView(wxCommandEvent& event)
 {
-    if(::wxMessageBox(_("Close SVN view?"), _("Confirm"), wxICON_QUESTION | wxYES_NO | wxCANCEL | wxCANCEL_DEFAULT) !=
-       wxYES) {
-        return;
+    if(!m_curpath.IsEmpty()) {
+        if(::wxMessageBox(_("Close SVN view?"), _("Confirm"),
+                          wxICON_QUESTION | wxYES_NO | wxCANCEL | wxCANCEL_DEFAULT) != wxYES) {
+            return;
+        }
+        DoCloseView();
+        
+        // Clear the source control bitmap
+        clGetManager()->GetStatusBar()->SetSourceControlBitmap(wxNullBitmap, "", "");
     }
-    DoCloseView();
 }
 
 void SubversionView::DoCloseView()
@@ -1243,6 +1258,12 @@ void SubversionView::DoCloseView()
     DoChangeRootPathUI("");
     wxCommandEvent dummy;
     OnClearOuptut(dummy);
+
+    if(m_workspaceFile.IsOk() && m_workspaceFile.FileExists()) {
+        WorkspaceSvnSettings conf(m_workspaceFile);
+        conf.SetRepoPath(m_curpath);
+        conf.Save();
+    }
 }
 
 void SubversionView::OnCommitGotoAnything(wxCommandEvent& event)

@@ -35,10 +35,12 @@ class WebToolsConfig : public clConfigItem
     size_t m_htmlFlags;
     wxString m_nodejs;
     wxString m_npm;
+    size_t m_nodeOptions;
+    int m_portNumber = 12089;
 
 public:
-    virtual void FromJSON(const JSONElement& json);
-    virtual JSONElement ToJSON() const;
+    virtual void FromJSON(const JSONItem& json);
+    virtual JSONItem ToJSON() const;
 
     enum eJSFlags {
         kJSEnableCC = (1 << 0),
@@ -56,6 +58,10 @@ public:
         kJSPluginRequireJS = (1 << 12),
         kJSWebPack = (1 << 13),
         kJSNodeExpress = (1 << 14),
+    };
+
+    enum eNodeJSFlags {
+        kLintOnSave = (1 << 0),
     };
 
     enum eHtmlFlags {
@@ -76,10 +82,15 @@ protected:
         }
     }
     bool HasFlag(const size_t& flags, int flag) const { return flags & flag; }
+    WebToolsConfig();
 
 public:
-    WebToolsConfig();
     virtual ~WebToolsConfig();
+
+    void SetPortNumber(int portNumber) { this->m_portNumber = portNumber; }
+    int GetPortNumber() const { return m_portNumber; }
+    
+    static WebToolsConfig& Get();
     bool HasJavaScriptFlag(eJSFlags flag) const { return HasFlag(m_jsFlags, flag); }
     void EnableJavaScriptFlag(eJSFlags flag, bool b) { EnableFlag(m_jsFlags, flag, b); }
 
@@ -93,13 +104,23 @@ public:
     void SetNpm(const wxString& npm) { this->m_npm = npm; }
     const wxString& GetNodejs() const { return m_nodejs; }
     const wxString& GetNpm() const { return m_npm; }
+
+    bool IsLintOnSave() const { return HasFlag(m_nodeOptions, kLintOnSave); }
+    void SetLintOnSave(bool b) { EnableFlag(m_nodeOptions, kLintOnSave, b); }
+    
+    bool IsNodeInstalled() const;
+    bool IsNpmInstalled() const;
+    
+    wxFileName GetTernScript() const;
+    bool IsTernInstalled() const;
+    wxString GetTempFolder(bool create = false) const;
     
     /**
      * @brief create tern project file content based on the settings
      */
     wxString GetTernProjectFile() const;
     WebToolsConfig& Load();
-    WebToolsConfig& Save();
+    WebToolsConfig& SaveConfig();
 };
 
 #endif // WEBTOOLSCONFIG_H

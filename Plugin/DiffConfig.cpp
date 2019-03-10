@@ -27,14 +27,14 @@
 
 DiffConfig::DiffConfig()
     : clConfigItem("CodeLiteDiff")
-    , m_flags(0)
+    , m_flags(kShowLineNumbers)
     , m_viewFlags(kViewVerticalSplit)
 {
 }
 
 DiffConfig::~DiffConfig() {}
 
-void DiffConfig::FromJSON(const JSONElement& json)
+void DiffConfig::FromJSON(const JSONItem& json)
 {
     m_flags = json.namedObject("m_flags").toSize_t(0);
     m_viewFlags = json.namedObject("m_viewFlags").toSize_t(kViewVerticalSplit);
@@ -42,9 +42,9 @@ void DiffConfig::FromJSON(const JSONElement& json)
     m_rightFile = json.namedObject("m_rightFile").toString();
 }
 
-JSONElement DiffConfig::ToJSON() const
+JSONItem DiffConfig::ToJSON() const
 {
-    JSONElement element = JSONElement::createObject(GetName());
+    JSONItem element = JSONItem::createObject(GetName());
     element.addProperty("m_flags", m_flags);
     element.addProperty("m_viewFlags", m_viewFlags);
     element.addProperty("m_leftFile", m_leftFile);

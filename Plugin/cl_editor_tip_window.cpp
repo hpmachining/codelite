@@ -38,6 +38,7 @@
 #include <wx/stc/stc.h>
 #include "ieditor.h"
 #include "imanager.h"
+#include <wx/dcgraph.h>
 
 BEGIN_EVENT_TABLE(clEditorTipWindow, wxPanel)
 EVT_PAINT(clEditorTipWindow::OnPaint)
@@ -52,11 +53,7 @@ clEditorTipWindow::clEditorTipWindow(wxWindow* parent)
 {
     SetBackgroundStyle(wxBG_STYLE_PAINT);
     IEditor* editor = ::clGetManager()->GetActiveEditor();
-    if(editor) {
-        m_font = editor->GetCtrl()->StyleGetFont(0);
-    } else {
-        m_font = DrawingUtils::GetDefaultFixedFont();
-    }
+    m_font = DrawingUtils::GetBestFixedFont(editor);
     Hide();
     EventNotifier::Get()->Connect(wxEVT_CMD_COLOURS_FONTS_UPDATED,
                                   clCommandEventHandler(clEditorTipWindow::OnEditoConfigChanged), NULL, this);
@@ -73,17 +70,23 @@ void clEditorTipWindow::OnEraseBg(wxEraseEvent& e) { wxUnusedVar(e); }
 void clEditorTipWindow::OnPaint(wxPaintEvent& e)
 {
     wxUnusedVar(e);
-    wxAutoBufferedPaintDC dc(this);
+    wxAutoBufferedPaintDC bdc(this);
+    wxGCDC dc(bdc);
     PrepareDC(dc);
 
     if(m_args.IsEmpty()) return;
 
     // Define the colours used by this tooltip window
     clColours colours = DrawingUtils::GetColours();
-
-    // If we got an active editor, adjust the coluors to match editor's colours
     IEditor* editor = clGetManager()->GetActiveEditor();
-    if(editor) { colours.InitFromColour(editor->GetCtrl()->StyleGetBackground(0)); }
+    if(editor) {
+        wxColour bgColour = editor->GetCtrl()->StyleGetBackground(0);
+        if(DrawingUtils::IsDark(bgColour)) {
+            colours.InitFromColour(bgColour);
+        } else {
+            colours.InitFromColour(wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
+        }
+    }
 
     wxColour bgColour, penColour, textColour, highlightBgColour, highlightFgColour;
     bgColour = colours.GetBgColour();
@@ -154,7 +157,7 @@ void clEditorTipWindow::OnPaint(wxPaintEvent& e)
 
         wxPoint extraLinePt;
         extraLinePt.x = rr.GetWidth() - extraLineSize.x - TIP_SPACER;
-        extraLinePt.y = rr.GetHeight() - extraLineSize.y;
+        extraLinePt.y = y + 2;
         dc.SetTextForeground(textColour);
         dc.DrawText(m_footer, extraLinePt);
     }
@@ -290,38 +293,26 @@ void clEditorTipWindow::Deactivate()
 
 wxSize clEditorTipWindow::DoGetTipSize()
 {
-    wxDC* dc;
-
-    wxGCDC gdc;
     wxBitmap bmp(1, 1);
     wxMemoryDC memDC(bmp);
-
-#ifdef __WXGTK__
-    dc = (wxDC*)&memDC;
-#else
-    if(!DrawingUtils::GetGCDC(memDC, gdc)) {
-        dc = (wxDC*)&memDC;
-    } else {
-        dc = (wxDC*)&gdc;
-    }
-#endif
-    PrepareDC(*dc);
+    wxGCDC dc(memDC);
+    PrepareDC(dc);
 
     wxFont f = m_font;
     f.SetWeight(wxFONTWEIGHT_BOLD);
 
-    dc->SetFont(f);
-    wxSize helperTextSize = dc->GetTextExtent("Tp");
+    dc.SetFont(f);
+    wxSize helperTextSize = dc.GetTextExtent("Tp");
 
     int lineHeight = helperTextSize.y;
     int minLineWidth = wxNOT_FOUND;
     if(!m_footer.IsEmpty()) {
         // Multiple signatures
-        minLineWidth = dc->GetTextExtent(m_footer).x;
+        minLineWidth = dc.GetTextExtent(m_footer).x;
     }
 
     if(!m_header.IsEmpty()) {
-        wxSize headerSize = dc->GetTextExtent(m_header);
+        wxSize headerSize = dc.GetTextExtent(m_header);
         minLineWidth = headerSize.x > minLineWidth ? headerSize.x : minLineWidth;
     }
 
@@ -331,7 +322,7 @@ wxSize clEditorTipWindow::DoGetTipSize()
 
     wxSize sz;
     wxSize sz2;
-    sz = dc->GetMultiLineTextExtent(tipContent);
+    sz = dc.GetMultiLineTextExtent(tipContent);
 
     // add spacers
     sz.y = (m_args.size() * lineHeight);

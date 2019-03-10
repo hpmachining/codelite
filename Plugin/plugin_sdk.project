@@ -44,7 +44,27 @@
  }]]]>
     </Plugin>
   </Plugins>
+  <VirtualDirectory Name="LanguageServerProtocol">
+    <File Name="LanguageServerProtocol.h"/>
+    <File Name="LanguageServerProtocol.cpp"/>
+  </VirtualDirectory>
+  <VirtualDirectory Name="CustomControls">
+    <File Name="clThemedChoice.cpp"/>
+    <File Name="clThemedChoice.h"/>
+    <File Name="clChoice.h"/>
+    <File Name="clChoice.cpp"/>
+    <File Name="clInfoBar.cpp"/>
+    <File Name="clInfoBar.h"/>
+    <File Name="clThemedButton.cpp"/>
+    <File Name="clThemedButton.h"/>
+    <File Name="clButtonBase.h"/>
+    <File Name="clButtonBase.cpp"/>
+    <File Name="clButton.h"/>
+    <File Name="clButton.cpp"/>
+  </VirtualDirectory>
   <VirtualDirectory Name="clTreeCtrl">
+    <File Name="clCustomScrollBar.cpp"/>
+    <File Name="clCustomScrollBar.h"/>
     <File Name="clThemedListCtrl.cpp"/>
     <File Name="clThemedListCtrl.h"/>
     <File Name="clControlWithItems.cpp"/>
@@ -113,6 +133,8 @@
     <Topleveldir>/src/codelite/Plugin</Topleveldir>
   </Reconciliation>
   <VirtualDirectory Name="src">
+    <File Name="clSystemSettings.cpp"/>
+    <File Name="clSystemSettings.h"/>
     <File Name="async_executable_cmd.cpp"/>
     <File Name="build_config.cpp"/>
     <File Name="buildmanager.cpp"/>
@@ -246,6 +268,8 @@
     <File Name="clStrings.h"/>
   </VirtualDirectory>
   <VirtualDirectory Name="Commons">
+    <File Name="clThemeUpdater.cpp"/>
+    <File Name="clThemeUpdater.h"/>
     <File Name="clGenericSTCStyler.cpp"/>
     <File Name="clGenericSTCStyler.h"/>
     <File Name="xmlutils.cpp"/>
@@ -570,9 +594,11 @@
   <Dependencies Name="WinDebug_29"/>
   <Dependencies Name="WinRelease_29"/>
   <VirtualDirectory Name="wxcrafter">
+    <File Name="DiffUI.wxcp"/>
     <File Name="clResizableTooltipBase.wxcp"/>
     <File Name="clAboutDialogBase.wxcp"/>
     <VirtualDirectory Name="resources">
+      <File Name="DiffUI_plugin_bitmaps.cpp"/>
       <File Name="clResizableTooltipBase_plugin_bitmaps.cpp"/>
       <File Name="clAboutDialogBase_plugin_bitmaps.cpp"/>
       <File Name="VirtualDirectorySelector_plugin_bitmaps.cpp"/>
@@ -591,6 +617,8 @@
       <File Name="GotoAnythingBaseUI_plugin_bitmaps.cpp"/>
     </VirtualDirectory>
     <VirtualDirectory Name="base">
+      <File Name="DiffUI.cpp"/>
+      <File Name="DiffUI.h"/>
       <File Name="clResizableTooltipBase.cpp"/>
       <File Name="clResizableTooltipBase.h"/>
       <File Name="clAboutDialogBase.cpp"/>
@@ -645,6 +673,12 @@
     <File Name="sftp_settings.h"/>
   </VirtualDirectory>
   <VirtualDirectory Name="Diff">
+    <File Name="DiffFoldersDlg.cpp"/>
+    <File Name="DiffFoldersDlg.h"/>
+    <File Name="DiffSelectFoldersDlg.cpp"/>
+    <File Name="DiffSelectFoldersDlg.h"/>
+    <File Name="DiffFoldersFrame.cpp"/>
+    <File Name="DiffFoldersFrame.h"/>
     <File Name="clDiffFrame.cpp"/>
     <File Name="clDiffFrame.h"/>
     <VirtualDirectory Name="dtl">
@@ -692,7 +726,6 @@
     <File Name="clZipWriter.h"/>
     <File Name="clZipWriter.cpp"/>
   </VirtualDirectory>
-  <VirtualDirectory Name="wxFlatButtonBar"/>
   <VirtualDirectory Name="Keyboard">
     <File Name="clKeyboardManager.cpp"/>
     <File Name="clKeyboardManager.h"/>
@@ -706,6 +739,8 @@
     <File Name="newkeyshortcutdlg.h"/>
   </VirtualDirectory>
   <VirtualDirectory Name="NodeJS">
+    <File Name="clNodeJS.cpp"/>
+    <File Name="clNodeJS.h"/>
     <File Name="NodeJSLocator.h"/>
     <File Name="NodeJSLocator.cpp"/>
     <File Name="clJSCTags.cpp"/>

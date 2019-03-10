@@ -38,6 +38,7 @@
 #include <wx/ffile.h>
 #include <wx/stdpaths.h>
 #include <wx/tokenzr.h>
+#include "clSystemSettings.h"
 
 std::unordered_map<wxString, wxBitmap> BitmapLoader::m_toolbarsBitmaps;
 std::unordered_map<wxString, wxString> BitmapLoader::m_manifest;
@@ -55,6 +56,11 @@ const wxBitmap& BitmapLoader::LoadBitmap(const wxString& name, int requestedSize
     // try to load a new bitmap first
     wxString newName;
     newName << requestedSize << "-" << name.AfterLast('/');
+
+#ifdef __WXGTK__
+    if(clBitmap::ShouldLoadHiResImages()) { newName << "@2x"; }
+#endif
+
     std::unordered_map<wxString, wxBitmap>::const_iterator iter = m_toolbarsBitmaps.find(newName);
     if(iter != m_toolbarsBitmaps.end()) {
         const wxBitmap& b = iter->second;
@@ -154,6 +160,9 @@ wxIcon BitmapLoader::GetIcon(const wxBitmap& bmp) const
     return icn;
 }
 
+#define DARK_ICONS _("Dark Theme Icons Set")
+#define LIGHT_ICONS _("Light Theme Icons Set")
+
 void BitmapLoader::initialize()
 {
     wxString zipname;
@@ -176,12 +185,12 @@ void BitmapLoader::initialize()
         }
     }
 
-    // Load the bitmaps based on the current theme
+    // Load the bitmaps based on the current theme background colour
     wxFileName fnNewZip(clStandardPaths::Get().GetDataDir(), "codelite-bitmaps-light.zip");
-    if(DrawingUtils::IsDark(wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE))) {
+    if(DrawingUtils::IsDark(clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE))) {
         fnNewZip.SetFullName("codelite-bitmaps-dark.zip");
     }
-
+    
     if(fnNewZip.FileExists()) {
         clZipReader zip(fnNewZip);
         wxFileName tmpFolder(clStandardPaths::Get().GetTempDir(), "");
@@ -206,13 +215,16 @@ void BitmapLoader::initialize()
 
         for(size_t i = 0; i < files.size(); ++i) {
             wxFileName pngFile(files.Item(i));
+            wxString fullpath = pngFile.GetFullPath();
+#ifndef __WXGTK__
             if(pngFile.GetFullName().Contains("@2x")) {
                 // No need to load the hi-res images manually,
                 // this is done by wxWidgets
                 continue;
             }
+#endif
             clBitmap bmp;
-            if(bmp.LoadFile(pngFile.GetFullPath(), wxBITMAP_TYPE_PNG)) {
+            if(bmp.LoadFile(fullpath, wxBITMAP_TYPE_PNG)) {
                 clDEBUG1() << "Adding new image:" << pngFile.GetName() << clEndl;
                 m_toolbarsBitmaps.erase(pngFile.GetName());
                 m_toolbarsBitmaps.insert({ pngFile.GetName(), bmp });

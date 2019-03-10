@@ -34,6 +34,7 @@
 #include <wx/panel.h>
 #include <wx/renderer.h>
 #include <wx/stc/stc.h>
+#include "clSystemSettings.h"
 
 #ifdef __WXMSW__
 #include <wx/msw/registry.h>
@@ -290,27 +291,26 @@ wxColour DrawingUtils::DarkColour(const wxColour& color, float percent)
     return wxColour((unsigned char)r, (unsigned char)g, (unsigned char)b);
 }
 
-wxColour DrawingUtils::GetPanelBgColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE); }
+wxColour DrawingUtils::GetPanelBgColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE); }
 
-wxColour DrawingUtils::GetPanelTextColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_BTNTEXT); }
+wxColour DrawingUtils::GetPanelTextColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_BTNTEXT); }
 
-wxColour DrawingUtils::GetTextCtrlTextColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT); }
+wxColour DrawingUtils::GetTextCtrlTextColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT); }
 
-wxColour DrawingUtils::GetMenuTextColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_MENUTEXT); }
+wxColour DrawingUtils::GetMenuTextColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_MENUTEXT); }
 
 wxColour DrawingUtils::GetMenuBarBgColour(bool miniToolbar)
 {
 #ifdef __WXMSW__
-    // return miniToolbar ? wxSystemSettings::GetColour(wxSYS_COLOUR_MENUBAR) : wxColour("rgb(245,246,247)");
-    return wxColour("rgb(245,246,247)");
+    return clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
 #elif defined(__WXOSX__)
     wxUnusedVar(miniToolbar);
-    return wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
+    return clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
 #else
     wxUnusedVar(miniToolbar);
-    return wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
-//    return miniToolbar ? wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE)
-//                       : wxSystemSettings::GetColour(wxSYS_COLOUR_MENUBAR);
+    return clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
+//    return miniToolbar ? clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE)
+//                       : clSystemSettings::GetColour(wxSYS_COLOUR_MENUBAR);
 #endif
 }
 
@@ -357,26 +357,26 @@ void DrawingUtils::FillMenuBarBgColour(wxDC& dc, const wxRect& rect, bool miniTo
 #endif
 }
 
-wxColour DrawingUtils::GetMenuBarTextColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_MENUTEXT); }
+wxColour DrawingUtils::GetMenuBarTextColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_MENUTEXT); }
 
-wxColour DrawingUtils::GetTextCtrlBgColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW); }
+wxColour DrawingUtils::GetTextCtrlBgColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_WINDOW); }
 
-wxColour DrawingUtils::GetOutputPaneFgColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT); }
+wxColour DrawingUtils::GetOutputPaneFgColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT); }
 
-wxColour DrawingUtils::GetOutputPaneBgColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW); }
+wxColour DrawingUtils::GetOutputPaneBgColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_WINDOW); }
 
 wxColour DrawingUtils::GetThemeBgColour() { return GetOutputPaneBgColour(); }
 
-wxColour DrawingUtils::GetThemeBorderColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_3DSHADOW); }
+wxColour DrawingUtils::GetThemeBorderColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_3DSHADOW); }
 
-wxColour DrawingUtils::GetThemeTextColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT); }
+wxColour DrawingUtils::GetThemeTextColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT); }
 
 wxColour DrawingUtils::GetThemeTipBgColour()
 {
     if(IsThemeDark()) {
         return GetThemeBgColour();
     } else {
-        return wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
+        return clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
     }
 }
 
@@ -454,7 +454,7 @@ bool DrawingUtils::DrawStippleBackground(const wxRect& rect, wxDC& dc)
 
 wxColour DrawingUtils::GetCaptionColour()
 {
-    wxColour defaultCaptionColour = wxSystemSettings::GetColour(wxSYS_COLOUR_ACTIVECAPTION);
+    wxColour defaultCaptionColour = clSystemSettings::GetColour(wxSYS_COLOUR_ACTIVECAPTION);
     return defaultCaptionColour;
 }
 
@@ -463,7 +463,7 @@ wxFont DrawingUtils::GetDefaultFixedFont()
     wxFont f(GetDefaultGuiFont());
     f.SetFamily(wxFONTFAMILY_TELETYPE);
     f.SetFaceName(DEFAULT_FACE_NAME);
-    f.SetPointSize(DEFAULT_FONT_SIZE);
+    // f.SetPointSize(DEFAULT_FONT_SIZE);
     return f;
 }
 
@@ -595,9 +595,9 @@ wxSize DrawingUtils::GetBestSize(const wxString& label, int xspacer, int yspacer
     return size;
 }
 
-wxColour DrawingUtils::GetButtonBgColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE); }
+wxColour DrawingUtils::GetButtonBgColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE); }
 
-wxColour DrawingUtils::GetButtonTextColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_BTNTEXT); }
+wxColour DrawingUtils::GetButtonTextColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_BTNTEXT); }
 
 void DrawingUtils::DrawButtonX(wxDC& dc, wxWindow* win, const wxRect& rect, const wxColour& penColour,
                                const wxColour& bgColouur, eButtonState state)
@@ -714,41 +714,32 @@ void DrawingUtils::DrawButtonMaximizeRestore(wxDC& dc, wxWindow* win, const wxRe
 
 void DrawingUtils::DrawDropDownArrow(wxWindow* win, wxDC& dc, const wxRect& rect, const wxColour& colour)
 {
-#ifdef __WXGTK__
-    wxRendererNative::Get().DrawDropArrow(win, dc, rect, 0);
-#else
-    int size = wxMin(rect.GetHeight(), rect.GetWidth());
-    size = wxMin(8, size);
-    wxRect arrowRect = wxRect(0, 0, size, size);
-    int xx = rect.GetX() + ((rect.GetWidth() - arrowRect.GetWidth()) / 2);
-    int yy = rect.GetY() + ((rect.GetHeight() - arrowRect.GetHeight()) / 2);
-    arrowRect = wxRect(wxPoint(xx, yy), arrowRect.GetSize());
-
-    wxPoint points[3];
-    points[0] = arrowRect.GetTopLeft();
-    points[1] = arrowRect.GetTopRight();
-    points[2].x = arrowRect.GetBottomLeft().x + (arrowRect.GetWidth() / 2);
-    points[2].y = arrowRect.GetBottomLeft().y;
-
-    // if a user provided a colour for the button, use it
+    // Draw an arrow
+    wxRect buttonRect(rect);
+    int sz = wxMin(rect.GetHeight(), rect.GetWidth());
+    sz = wxMin(10, sz);
+    double height = ((double)sz / 3.0) * 2;
+    buttonRect.SetHeight(height);
+    buttonRect.SetWidth(sz);
+    buttonRect = buttonRect.CenterIn(rect);
+    
     wxColour buttonColour = colour;
     if(!buttonColour.IsOk()) {
         // No colour provided, provide one
-        wxColour buttonFace = wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE);
-        if(DrawingUtils::IsDark(buttonFace)) {
+        wxColour buttonFace = clSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE);
+        if(IsDark(buttonFace)) {
             buttonColour = buttonFace.ChangeLightness(150);
         } else {
-            buttonColour = wxSystemSettings::GetColour(wxSYS_COLOUR_3DDKSHADOW);
+            buttonColour = clSystemSettings::GetColour(wxSYS_COLOUR_3DDKSHADOW);
         }
     }
-
-    dc.SetPen(buttonColour);
-    dc.SetBrush(buttonColour);
-    dc.DrawPolygon(3, points);
-#endif
+    wxPoint downCenterPoint = wxPoint(buttonRect.GetBottomLeft().x + buttonRect.GetWidth() / 2, buttonRect.GetBottom());
+    dc.SetPen(wxPen(buttonColour, 2));
+    dc.DrawLine(buttonRect.GetTopLeft(), downCenterPoint);
+    dc.DrawLine(buttonRect.GetTopRight(), downCenterPoint);
 }
 
-wxColour DrawingUtils::GetCaptionTextColour() { return wxSystemSettings::GetColour(wxSYS_COLOUR_CAPTIONTEXT); }
+wxColour DrawingUtils::GetCaptionTextColour() { return clSystemSettings::GetColour(wxSYS_COLOUR_CAPTIONTEXT); }
 
 #ifdef __WXMSW__
 #define X_MARGIN 6
@@ -756,13 +747,63 @@ wxColour DrawingUtils::GetCaptionTextColour() { return wxSystemSettings::GetColo
 #define X_MARGIN 4
 #endif
 
+void DrawingUtils::DrawCustomChoice(wxWindow* win, wxDC& dc, const wxRect& rect, const wxString& label,
+                                    const wxColour& baseColour, const wxBitmap& bmp, int align)
+{
+    wxRect choiceRect = rect;
+    // Fill the drop down button with the custom base colour
+    dc.SetPen(baseColour);
+    dc.SetBrush(baseColour);
+    dc.DrawRectangle(rect);
+
+    // Create colour pallete
+    clColours c;
+    c.InitFromColour(baseColour);
+    wxColour borderColour = c.GetBorderColour();
+    wxColour arrowColour = c.GetDarkBorderColour();
+    wxColour textColour = c.GetItemTextColour();
+
+    int width = choiceRect.GetHeight();
+    wxRect dropDownRect = wxRect(0, 0, width, width);
+    int x = choiceRect.GetX() + choiceRect.GetWidth() - dropDownRect.GetWidth();
+    dropDownRect.SetX(x);
+    dropDownRect = dropDownRect.CenterIn(choiceRect, wxVERTICAL);
+    dc.SetBrush(baseColour);
+    dc.SetPen(borderColour);
+    dc.DrawRoundedRectangle(choiceRect, 3.0);
+    DrawDropDownArrow(win, dc, dropDownRect, arrowColour);
+
+    // Common to all platforms: draw the text + bitmap
+    wxRect textRect = choiceRect;
+    textRect.SetWidth(textRect.GetWidth() - textRect.GetHeight());
+    dc.SetClippingRegion(textRect);
+
+    int xx = textRect.GetX() + X_MARGIN;
+    if(bmp.IsOk()) {
+        // Draw bitmap first
+        wxRect bmpRect(xx, textRect.GetY(), bmp.GetScaledWidth(), bmp.GetScaledHeight());
+        bmpRect = bmpRect.CenterIn(choiceRect, wxVERTICAL);
+        dc.DrawBitmap(bmp, bmpRect.GetTopLeft());
+        xx += bmpRect.GetWidth() + X_MARGIN;
+    }
+    dc.SetFont(GetDefaultGuiFont());
+    wxSize textSize = dc.GetTextExtent(label);
+    textRect.SetHeight(textSize.GetHeight());
+    textRect = textRect.CenterIn(choiceRect, wxVERTICAL);
+    wxString truncatedText;
+    TruncateText(label, textRect.GetWidth(), dc, truncatedText);
+    dc.SetTextForeground(textColour);
+    dc.DrawText(truncatedText, xx, textRect.GetY());
+    dc.DestroyClippingRegion();
+}
+
 void DrawingUtils::DrawNativeChoice(wxWindow* win, wxDC& dc, const wxRect& rect, const wxString& label,
                                     const wxBitmap& bmp, int align)
 {
     wxRect choiceRect = rect;
 #if defined(__WXMSW__) || defined(__WXGTK__)
 #ifdef __WXMSW__
-    int width = wxSystemSettings::GetMetric(wxSYS_SMALLICON_X);
+    int width = clSystemSettings::GetMetric(wxSYS_SMALLICON_X);
 #else
     int width = choiceRect.GetHeight();
 #endif
@@ -774,7 +815,7 @@ void DrawingUtils::DrawNativeChoice(wxWindow* win, wxDC& dc, const wxRect& rect,
     wxRendererNative::Get().DrawDropArrow(win, dc, dropDownRect, 0);
 #else
     // OSX
-    wxColour bgColour = wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
+    wxColour bgColour = clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
     if(IsDark(bgColour)) {
         // On Dark theme (Mojave and later)
         int width = choiceRect.GetHeight();
@@ -782,8 +823,8 @@ void DrawingUtils::DrawNativeChoice(wxWindow* win, wxDC& dc, const wxRect& rect,
         int x = choiceRect.GetX() + choiceRect.GetWidth() - dropDownRect.GetWidth();
         dropDownRect.SetX(x);
         dropDownRect = dropDownRect.CenterIn(choiceRect, wxVERTICAL);
-        wxColour borderColour = wxSystemSettings::GetColour(wxSYS_COLOUR_BTNHIGHLIGHT);
-        dc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE));
+        wxColour borderColour = clSystemSettings::GetColour(wxSYS_COLOUR_BTNHIGHLIGHT);
+        dc.SetBrush(clSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE));
         dc.SetPen(borderColour);
         dc.DrawRoundedRectangle(choiceRect, 3.0);
         DrawDropDownArrow(win, dc, dropDownRect);
@@ -811,7 +852,7 @@ void DrawingUtils::DrawNativeChoice(wxWindow* win, wxDC& dc, const wxRect& rect,
     textRect = textRect.CenterIn(choiceRect, wxVERTICAL);
     wxString truncatedText;
     TruncateText(label, textRect.GetWidth(), dc, truncatedText);
-    dc.SetTextForeground(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
+    dc.SetTextForeground(clSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
     dc.DrawText(truncatedText, xx, textRect.GetY());
     dc.DestroyClippingRegion();
 }
@@ -831,4 +872,17 @@ clColours& DrawingUtils::GetColours(bool darkColours)
     } else {
         return g_normalColours;
     }
+}
+
+wxFont DrawingUtils::GetBestFixedFont(IEditor* editor)
+{
+    wxFont defaultFont = DrawingUtils::GetDefaultFixedFont();
+    wxFont bestFont = defaultFont;
+    if(editor) {
+        bestFont = editor->GetCtrl()->StyleGetFont(0);
+#ifndef __WXGTK3__
+        bestFont.SetPointSize(defaultFont.GetPointSize());
+#endif
+    }
+    return bestFont;
 }

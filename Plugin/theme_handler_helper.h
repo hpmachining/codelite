@@ -30,6 +30,7 @@
 #include <wx/window.h>
 #include "codelite_exports.h"
 #include <wx/sharedptr.h>
+#include "cl_command_event.h"
 
 class WXDLLIMPEXP_SDK ThemeHandlerHelper : public wxEvtHandler
 {
@@ -43,12 +44,14 @@ private:
 
 public:
     void UpdateColours(wxWindow* topWindow);
+    void UpdateNotebookColours(wxWindow* topWindow);
 
 public:
     ThemeHandlerHelper(wxWindow* win);
     virtual ~ThemeHandlerHelper();
     void OnThemeChanged(wxCommandEvent& e);
     void OnPreferencesUpdated(wxCommandEvent& e);
+    void OnColoursUpdated(clCommandEvent& e);
 };
 
 #endif // THEMEHANDLERHELPER_H

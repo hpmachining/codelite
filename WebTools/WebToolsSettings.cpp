@@ -3,6 +3,7 @@
 #include "WebToolsConfig.h"
 #include "globals.h"
 #include "NodeJSLocator.h"
+#include "clNodeJS.h"
 
 WebToolsSettings::WebToolsSettings(wxWindow* parent)
     : WebToolsSettingsBase(parent)
@@ -10,8 +11,8 @@ WebToolsSettings::WebToolsSettings(wxWindow* parent)
 {
     ::wxPGPropertyBooleanUseCheckbox(m_pgMgr->GetGrid());
     {
-        WebToolsConfig config;
-        config.Load();
+        WebToolsConfig& config = WebToolsConfig::Get();
+
         // JS
         m_checkBoxEnableJsCC->SetValue(config.HasJavaScriptFlag(WebToolsConfig::kJSEnableCC));
         m_pgPropLogging->SetValue(config.HasJavaScriptFlag(WebToolsConfig::kJSEnableVerboseLogging));
@@ -28,7 +29,8 @@ WebToolsSettings::WebToolsSettings(wxWindow* parent)
         m_pgPropQML->SetValue(config.HasJavaScriptFlag(WebToolsConfig::kJSPluginQML));
         m_pgPropNodeExpress->SetValue(config.HasJavaScriptFlag(WebToolsConfig::kJSNodeExpress));
         m_pgPropWebPack->SetValue(config.HasJavaScriptFlag(WebToolsConfig::kJSWebPack));
-
+        m_pgPropPortNumber->SetValue(config.GetPortNumber());
+        
         // XML
         m_checkBoxEnableXmlCC->SetValue(config.HasXmlFlag(WebToolsConfig::kXmlEnableCC));
         // HTML
@@ -36,6 +38,7 @@ WebToolsSettings::WebToolsSettings(wxWindow* parent)
         // NodeJS
         m_filePickerNodeJS->SetPath(config.GetNodejs());
         m_filePickerNpm->SetPath(config.GetNpm());
+        m_checkBoxJSLint->SetValue(config.IsLintOnSave());
     }
 
     SetName("WebToolsSettings");
@@ -85,9 +88,8 @@ void WebToolsSettings::OnApply(wxCommandEvent& event) { DoSave(); }
 
 void WebToolsSettings::DoSave()
 {
-    WebToolsConfig config;
-    config.Load();
-    
+    WebToolsConfig& config = WebToolsConfig::Get();
+
     // JS
     config.EnableJavaScriptFlag(WebToolsConfig::kJSEnableCC, m_checkBoxEnableJsCC->IsChecked());
     config.EnableJavaScriptFlag(WebToolsConfig::kJSEnableVerboseLogging, m_pgPropLogging->GetValue().GetBool());
@@ -104,16 +106,28 @@ void WebToolsSettings::DoSave()
     config.EnableJavaScriptFlag(WebToolsConfig::kJSPluginQML, m_pgPropQML->GetValue().GetBool());
     config.EnableJavaScriptFlag(WebToolsConfig::kJSNodeExpress, m_pgPropNodeExpress->GetValue().GetBool());
     config.EnableJavaScriptFlag(WebToolsConfig::kJSWebPack, m_pgPropWebPack->GetValue().GetBool());
-    
+    config.SetPortNumber(m_pgPropPortNumber->GetValue().GetInteger());
+
     // XML
     config.EnableXmlFlag(WebToolsConfig::kXmlEnableCC, m_checkBoxEnableXmlCC->IsChecked());
-    
+
     // HTML
     config.EnableHtmlFlag(WebToolsConfig::kHtmlEnableCC, m_checkBoxEnableHtmlCC->IsChecked());
-    
+
     // NodeJS
     config.SetNodejs(m_filePickerNodeJS->GetPath());
     config.SetNpm(m_filePickerNpm->GetPath());
-    config.Save();
+    config.SetLintOnSave(m_checkBoxJSLint->IsChecked());
+
+    wxFileName fnNodeJS(config.GetNodejs());
+    wxArrayString hints;
+    if(fnNodeJS.FileExists()) { hints.Add(fnNodeJS.GetPath()); }
+    clNodeJS::Get().Initialise(hints);
+
     m_modified = false;
+}
+void WebToolsSettings::OnLintOnSave(wxCommandEvent& event)
+{
+    wxUnusedVar(event);
+    m_modified = true;
 }

@@ -49,7 +49,6 @@
 #include "cl_defs.h"
 #include "cl_standard_paths.h"
 #include "cl_unredo.h"
-#include "clang_compilation_db_thread.h"
 #include "code_completion_manager.h"
 #include "console_frame.h"
 #include "event_notifier.h"
@@ -78,6 +77,8 @@
 #include <wx/stc/stc.h>
 #include <wx/wupdlock.h>
 #include "DebuggerToolBar.h"
+#include "clThemeUpdater.h"
+#include "clInfoBar.h"
 
 #ifdef __WXGTK20__
 // We need this ugly hack to workaround a gtk2-wxGTK name-clash
@@ -97,7 +98,6 @@
 #include "buildmanager.h"
 #include "buildtabsettingsdata.h"
 #include "cl_defs.h"
-#include "clang_code_completion.h"
 #include "configuration_manager_dlg.h"
 #include "cpp_symbol_tree.h"
 #include "debugcoredump.h"
@@ -328,6 +328,8 @@ EVT_MENU(XRCID("hide_status_bar"), clMainFrame::OnShowStatusBar)
 EVT_UPDATE_UI(XRCID("hide_status_bar"), clMainFrame::OnShowStatusBarUI)
 EVT_MENU(XRCID("hide_tool_bar"), clMainFrame::OnShowToolbar)
 EVT_UPDATE_UI(XRCID("hide_tool_bar"), clMainFrame::OnShowToolbarUI)
+EVT_MENU(XRCID("show_menu_bar"), clMainFrame::OnShowMenuBar)
+EVT_UPDATE_UI(XRCID("show_menu_bar"), clMainFrame::OnShowMenuBarUI)
 EVT_MENU(XRCID("show_tab_bar"), clMainFrame::OnShowTabBar)
 EVT_UPDATE_UI(XRCID("show_tab_bar"), clMainFrame::OnShowTabBarUI)
 EVT_MENU_RANGE(viewAsMenuItemID, viewAsMenuItemMaxID, clMainFrame::DispatchCommandEvent)
@@ -721,6 +723,7 @@ clMainFrame::clMainFrame(wxWindow* pParent, wxWindowID id, const wxString& title
     , m_webUpdate(NULL)
     , m_toolbar(NULL)
 {
+    clThemeUpdater::Get().RegisterWindow(this);
     if(!wxFrame::Create(pParent, id, title, pos, size, style)) { return; }
 
 #if defined(__WXGTK20__)
@@ -814,6 +817,7 @@ clMainFrame::clMainFrame(wxWindow* pParent, wxWindowID id, const wxString& title
 
     EventNotifier::Get()->Bind(wxEVT_DEBUG_STARTED, &clMainFrame::OnDebugStarted, this);
     EventNotifier::Get()->Bind(wxEVT_DEBUG_ENDED, &clMainFrame::OnDebugEnded, this);
+    m_infoBar->Bind(wxEVT_BUTTON, &clMainFrame::OnInfobarButton, this);
 
     // Start the code completion manager, we do this by calling it once
     CodeCompletionManager::Get();
@@ -859,6 +863,7 @@ clMainFrame::~clMainFrame(void)
 #if defined(__WXGTK__) && wxVERSION_NUMBER < 2904
     delete m_myMenuBar;
 #endif
+    m_infoBar->Unbind(wxEVT_BUTTON, &clMainFrame::OnInfobarButton, this);
     wxTheApp->Unbind(wxEVT_ACTIVATE_APP, &clMainFrame::OnAppActivated, this);
     wxTheApp->Disconnect(wxID_COPY, wxEVT_COMMAND_MENU_SELECTED,
                          wxCommandEventHandler(clMainFrame::DispatchCommandEvent), NULL, this);
@@ -1048,6 +1053,11 @@ void clMainFrame::CreateGUIControls()
     m_myMenuBar->Set(mb);
     SetMenuBar(mb);
 
+#ifdef __WXGTK__
+    bool showMenuBar = clConfig::Get().Read(kConfigShowMenuBar, true);
+    GetMenuBar()->Show(showMenuBar);
+#endif
+
     // Create the status bar
     m_statusBar = new clStatusBar(this, PluginManager::Get());
     SetStatusBar(m_statusBar);
@@ -1111,19 +1121,23 @@ void clMainFrame::CreateGUIControls()
     // Wrap the mainbook with a wxPanel
     // We do this so we can place the find bar under the main book
     wxPanel* container = new wxPanel(m_mainPanel);
+    clThemeUpdater::Get().RegisterWindow(container);
+
     container->SetSizer(new wxBoxSizer(wxVERTICAL));
     clEditorBar* navbar = new clEditorBar(container);
     navbar->Hide();
 
     container->GetSizer()->Add(navbar, 0, wxEXPAND | wxALL, 5);
-    
+
     // Add the debugger toolbar
     m_debuggerToolbar = new DebuggerToolBar(container);
     container->GetSizer()->Add(m_debuggerToolbar, 0, wxALIGN_LEFT);
 
     m_mainBook = new MainBook(container);
 
+    m_infoBar = new clInfoBar(container);
     container->GetSizer()->Add(m_mainBook, 1, wxEXPAND);
+    container->GetSizer()->Add(m_infoBar, 0, wxEXPAND);
     QuickFindBar* findbar = new QuickFindBar(container);
     findbar->Hide();
     container->GetSizer()->Add(findbar, 0, wxEXPAND);
@@ -1187,8 +1201,7 @@ void clMainFrame::CreateGUIControls()
                                          m_tagsOptionsData.GetParserExcludePaths());
 
     ParseThreadST::Get()->Start();
-    ClangCompilationDbThreadST::Get()->Start();
-
+    
     // Connect this tree to the parse thread
     ParseThreadST::Get()->SetNotifyWindow(this);
 
@@ -1262,6 +1275,10 @@ void clMainFrame::OnEditMenuOpened(wxMenuEvent& event)
     if(labelCurrentState) { // Here seems to be the only reliable place to do 'updateui' for this; a real UpdateUI
                             // handler is only hit when there's no editor :/
         labelCurrentState->Enable(editor != NULL);
+    } else {
+        // In wx3.1 Bind()ing wxEVT_MENU_OPEN for the Edit menu catches its submenu opens too, so we arrive here
+        // multiple times
+        return;
     }
 
     if(editor) {
@@ -1833,18 +1850,13 @@ void clMainFrame::OnSwitchWorkspace(wxCommandEvent& event)
     ManagerST::Get()->OpenWorkspace(wspFile);
 }
 
-void clMainFrame::OnCompleteWordRefreshList(wxCommandEvent& event)
-{
-    wxUnusedVar(event);
-    clEditor* editor = GetMainBook()->GetActiveEditor(true);
-    if(editor) { editor->CompleteWord(true); }
-}
+void clMainFrame::OnCompleteWordRefreshList(wxCommandEvent& event) { wxUnusedVar(event); }
 
 void clMainFrame::OnCodeComplete(wxCommandEvent& event)
 {
     wxUnusedVar(event);
     clEditor* editor = GetMainBook()->GetActiveEditor(true);
-    if(editor) { editor->CompleteWord(); }
+    if(editor) { editor->CompleteWord(LSP::CompletionItem::kTriggerUser); }
 }
 
 void clMainFrame::OnFunctionCalltip(wxCommandEvent& event)
@@ -2131,11 +2143,6 @@ void clMainFrame::OnCtagsOptions(wxCommandEvent& event)
             wxCommandEvent e(wxEVT_COMMAND_MENU_SELECTED, XRCID("retag_workspace"));
             AddPendingEvent(e);
         }
-
-#if HAS_LIBCLANG
-        // Clear clang's cache
-        ClangCodeCompletion::Instance()->ClearCache();
-#endif
         // Update the pre-processor dimming feature
         CodeCompletionManager::Get().RefreshPreProcessorColouring();
     }
@@ -2582,8 +2589,7 @@ void clMainFrame::OnTimer(wxTimerEvent& event)
         m_workspaceRetagIsRequired = false;
         wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, XRCID("full_retag_workspace"));
         this->AddPendingEvent(evt);
-        GetMainBook()->ShowMessage(_("Your workspace symbols file does not match the current version of CodeLite. "
-                                     "CodeLite will perform a full retag of the workspace"));
+        m_infoBar->DisplayMessage(_("A workspace reparse is needed"), wxICON_INFORMATION);
     }
 
     // For some reason, under Linux we need to force the menu accelerator again
@@ -3253,6 +3259,18 @@ void clMainFrame::CompleteInitialization()
             buttons.begin(), buttons.end(), [&](clToolBarButtonBase* button) { return button->GetLabel() == label; });
         if(iter != buttons.end()) { (*iter)->Show(false); }
     }
+
+    // Prompt the user to adjust his colours
+    bool colourAdjusted = clConfig::Get().Read("ColoursAdjusted", false);
+    if(!colourAdjusted) {
+        // Adjust the user colour
+        GetMessageBar()->DisplayMessage(
+            _("CodeLite now offers a better editor colour theme support, would you like to fix this now?"),
+            wxICON_QUESTION, { { XRCID("adjust-current-theme"), _("Yes") }, { wxID_NO, "" } });
+
+        // regardless of the answer, dont bug the user again
+        clConfig::Get().Write("ColoursAdjusted", true);
+    }
 }
 
 void clMainFrame::OnAppActivated(wxActivateEvent& e)
@@ -3869,7 +3887,13 @@ void clMainFrame::OnOpenShellFromFilePath(wxCommandEvent& e)
 void clMainFrame::OnSyntaxHighlight(wxCommandEvent& e)
 {
     SyntaxHighlightDlg dlg(this);
-    dlg.ShowModal();
+    if((dlg.ShowModal() == wxID_OK) && dlg.IsRestartRequired()) {
+        // A restart required
+        DoSuggestRestart();
+    }
+
+    // Update the notebook colours on the next event iteration so clSystemSettings will get updated first
+    m_themeHandler.CallAfter(&ThemeHandler::UpdateNotebookColours, this);
 }
 
 void clMainFrame::OnQuickDebug(wxCommandEvent& e)
@@ -4417,8 +4441,6 @@ void clMainFrame::OnDatabaseUpgradeInternally(wxCommandEvent& e)
 {
     wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, XRCID("full_retag_workspace"));
     this->AddPendingEvent(evt);
-    // GetMainBook()->ShowMessage(_("Your workspace symbols file does not match the current version of CodeLite.
-    // CodeLite will perform a full retag of the workspace"));
 }
 
 // Due to differnet schema versions, the database was truncated by the
@@ -4588,24 +4610,8 @@ void clMainFrame::OnGotoCodeLiteDownloadPage(wxCommandEvent& e)
 
 void clMainFrame::DoSuggestRestart()
 {
-#ifdef __WXMAC__
-    GetMainBook()->ShowMessage(_("Some of the changes made requires restart of CodeLite"));
-#else
-    // On Winodws & GTK we offer auto-restart
-    ButtonDetails btn1, btn2;
-    btn1.buttonLabel = _("Restart Now!");
-    btn1.commandId = wxEVT_CMD_RESTART_CODELITE;
-    btn1.menuCommand = false;
-    btn1.isDefault = true;
-    btn1.window = ManagerST::Get();
-
-    // set button window to NULL
-    btn2.buttonLabel = _("Not now");
-    btn2.window = NULL;
-
-    GetMainBook()->ShowMessage(_("Some of the changes made require a restart of CodeLite. Restart now?"), false,
-                               PluginManager::Get()->GetStdIcons()->LoadBitmap(wxT("messages/48/restart")), btn1, btn2);
-#endif
+    m_infoBar->DisplayMessage(_("A CodeLite restart is needed. Would you like to restart it now?"), wxICON_QUESTION,
+                              { { XRCID("restart-codelite"), _("Yes") }, { wxID_NO, _("No") } });
 }
 
 void clMainFrame::OnRestoreDefaultLayout(wxCommandEvent& e)
@@ -4677,6 +4683,10 @@ void clMainFrame::UpdateAUI()
 void clMainFrame::OnRetaggingCompelted(wxCommandEvent& e)
 {
     e.Skip();
+    
+    // Generate compile_commands.json file
+    ManagerST::Get()->GenerateCompileCommands();
+    
     GetStatusBar()->SetMessage(_("Done"));
     GetWorkspacePane()->ClearProgress();
 
@@ -5015,6 +5025,15 @@ void clMainFrame::OnWorkspaceClosed(wxCommandEvent& e)
 {
     e.Skip();
     CustomTargetsMgr::Get().Clear();
+    ManagerST::Get()->GetPerspectiveManager().ToggleOutputPane(true);
+#ifndef __WXMSW__
+#if wxVERSION_NUMBER >= 2900
+    // This is needed in >=wxGTK-2.9, otherwise the current editor sometimes doesn't notice that the output pane has
+    // appeared
+    // resulting in an area at the bottom that can't be scrolled to
+    clMainFrame::Get()->SendSizeEvent(wxSEND_EVENT_POST);
+#endif
+#endif
 }
 
 void clMainFrame::OnIncrementalSearchUI(wxUpdateUIEvent& event)
@@ -5438,6 +5457,8 @@ void clMainFrame::OnDuplicateTab(wxCommandEvent& event)
             if(!newEditor->SaveAs(currentFile->GetFileName().GetFullName(), currentFile->GetFileName().GetPath())) {
                 // If the "Save As" failed for any reason, remove the current editor
                 clGetManager()->CloseEditor(newEditor, false);
+                // Set the editor back to the current editor
+                GetMainBook()->GetFindBar()->SetEditor(currentFile->GetCtrl());
             }
         }
     }
@@ -5472,9 +5493,15 @@ void clMainFrame::OnToggleMinimalView(wxCommandEvent& event)
             DoShowToolbars(false, false);
         }
         if(m_frameHelper->IsCaptionsVisible()) { DoShowCaptions(false); }
+#ifndef __WXOSX__
+        GetMenuBar()->Hide();
+#endif
     } else {
         if(!m_frameHelper->IsToolbarShown()) { DoShowToolbars(true, false); }
         if(!m_frameHelper->IsCaptionsVisible()) { DoShowCaptions(true); }
+#ifndef __WXOSX__
+        GetMenuBar()->Show();
+#endif
     }
 
     // Update the various configurations
@@ -5593,6 +5620,7 @@ void clMainFrame::OnWordComplete(wxCommandEvent& event)
     clCodeCompletionEvent ccEvent(wxEVT_CC_WORD_COMPLETE);
     ccEvent.SetEditor(editor);
     ccEvent.SetEventObject(this);
+    ccEvent.SetTriggerKind(LSP::CompletionItem::kTriggerUser);
     ccEvent.SetWord(stc->GetTextRange(start, curPos));
     EventNotifier::Get()->ProcessEvent(ccEvent);
 
@@ -5712,3 +5740,38 @@ void clMainFrame::OnCustomiseToolbar(wxCommandEvent& event)
     }
     clConfig::Get().Write("ToolBarHiddenItems", hiddenItems);
 }
+
+void clMainFrame::OnInfobarButton(wxCommandEvent& event)
+{
+    event.Skip(); // needed to make sure that the bar is hidden
+    int buttonID = event.GetId();
+    if(buttonID == XRCID("restart-codelite")) {
+        ManagerST::Get()->OnCmdRestart(event);
+    } else {
+        clCommandEvent buttonEvent(wxEVT_INFO_BAR_BUTTON);
+        buttonEvent.SetInt(buttonID);
+        buttonEvent.SetEventObject(m_infoBar);
+        EventNotifier::Get()->AddPendingEvent(buttonEvent);
+    }
+}
+
+void clMainFrame::OnShowMenuBar(wxCommandEvent& event)
+{
+    bool isShown = GetMenuBar()->IsShown();
+    GetMenuBar()->Show(!isShown);
+    GetSizer()->Layout();
+    PostSizeEvent();
+    clConfig::Get().Write(kConfigShowMenuBar, !isShown);
+}
+
+void clMainFrame::OnShowMenuBarUI(wxUpdateUIEvent& event)
+{
+#ifdef __WXGTK__
+    event.Check(GetMenuBar()->IsShown());
+#else
+    event.Check(true);
+    event.Enable(false);
+#endif
+}
+
+void clMainFrame::Raise() { wxFrame::Raise(); }

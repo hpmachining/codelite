@@ -139,6 +139,7 @@ GitPlugin::GitPlugin(IManager* manager)
     Bind(wxEVT_ASYNC_PROCESS_OUTPUT, &GitPlugin::OnProcessOutput, this);
     Bind(wxEVT_ASYNC_PROCESS_TERMINATED, &GitPlugin::OnProcessTerminated, this);
 
+    EventNotifier::Get()->Bind(wxEVT_FILE_CREATED, &GitPlugin::OnFileCreated, this);
     EventNotifier::Get()->Connect(wxEVT_INIT_DONE, wxCommandEventHandler(GitPlugin::OnInitDone), NULL, this);
     EventNotifier::Get()->Connect(wxEVT_WORKSPACE_LOADED, wxCommandEventHandler(GitPlugin::OnWorkspaceLoaded), NULL,
                                   this);
@@ -156,6 +157,7 @@ GitPlugin::GitPlugin(IManager* manager)
     EventNotifier::Get()->Bind(wxEVT_CONTEXT_MENU_FOLDER, &GitPlugin::OnFolderMenu, this);
     EventNotifier::Get()->Bind(wxEVT_ACTIVE_PROJECT_CHANGED, &GitPlugin::OnActiveProjectChanged, this);
     EventNotifier::Get()->Bind(wxEVT_CODELITE_MAINFRAME_GOT_FOCUS, &GitPlugin::OnAppActivated, this);
+    EventNotifier::Get()->Bind(wxEVT_FILES_MODIFIED_REPLACE_IN_FILES, &GitPlugin::OnReplaceInFiles, this);
 
     wxTheApp->Bind(wxEVT_MENU, &GitPlugin::OnFolderPullRebase, this, XRCID("git_pull_rebase_folder"));
     wxTheApp->Bind(wxEVT_MENU, &GitPlugin::OnFolderCommit, this, XRCID("git_commit_folder"));
@@ -375,6 +377,7 @@ void GitPlugin::UnPlug()
         }
     }
 
+    EventNotifier::Get()->Unbind(wxEVT_FILE_CREATED, &GitPlugin::OnFileCreated, this);
     /*MENU*/
     m_eventHandler->Unbind(wxEVT_COMMAND_MENU_SELECTED, &GitPlugin::OnOpenMSYSGit, this, XRCID("git_msysgit"));
     m_eventHandler->Disconnect(XRCID("git_set_repository"), wxEVT_COMMAND_MENU_SELECTED,
@@ -424,6 +427,7 @@ void GitPlugin::UnPlug()
                                      wxCommandEventHandler(GitPlugin::OnWorkspaceConfigurationChanged), NULL, this);
     EventNotifier::Get()->Unbind(wxEVT_ACTIVE_PROJECT_CHANGED, &GitPlugin::OnActiveProjectChanged, this);
     EventNotifier::Get()->Unbind(wxEVT_CODELITE_MAINFRAME_GOT_FOCUS, &GitPlugin::OnAppActivated, this);
+    EventNotifier::Get()->Unbind(wxEVT_FILES_MODIFIED_REPLACE_IN_FILES, &GitPlugin::OnReplaceInFiles, this);
 
     /*Context Menu*/
     m_eventHandler->Disconnect(XRCID("git_add_file"), wxEVT_COMMAND_MENU_SELECTED,
@@ -1986,24 +1990,24 @@ void GitPlugin::DoCreateTreeImages()
 
 void GitPlugin::DoSetTreeItemImage(clTreeCtrl* ctrl, const wxTreeItemId& item, OverlayTool::BmpType bmpType) const
 {
-//    clConfig conf("git.conf");
-//    GitEntry data;
-//    conf.ReadItem(&data);
-//
-//    if(!(data.GetFlags() & GitEntry::Git_Colour_Tree_View)) return;
-//
-//    // get the base image first
-//    int curImgIdx = ctrl->GetItemImage(item);
-//    if(m_treeImageMapping.count(curImgIdx)) {
-//        int baseImg = m_treeImageMapping.find(curImgIdx)->second;
-//
-//        // now get the new image index based on the following:
-//        // baseCount + (imgIdx * bitmapCount) + BmpType
-//        int newImg = m_baseImageCount + (baseImg * 2) + bmpType;
-//
-//        // the below condition should never met, but I am paranoid..
-//        if(ctrl->GetBitmaps() && ctrl->GetBitmaps()->size() > newImg) { ctrl->SetItemImage(item, newImg); }
-//    }
+    //    clConfig conf("git.conf");
+    //    GitEntry data;
+    //    conf.ReadItem(&data);
+    //
+    //    if(!(data.GetFlags() & GitEntry::Git_Colour_Tree_View)) return;
+    //
+    //    // get the base image first
+    //    int curImgIdx = ctrl->GetItemImage(item);
+    //    if(m_treeImageMapping.count(curImgIdx)) {
+    //        int baseImg = m_treeImageMapping.find(curImgIdx)->second;
+    //
+    //        // now get the new image index based on the following:
+    //        // baseCount + (imgIdx * bitmapCount) + BmpType
+    //        int newImg = m_baseImageCount + (baseImg * 2) + bmpType;
+    //
+    //        // the below condition should never met, but I am paranoid..
+    //        if(ctrl->GetBitmaps() && ctrl->GetBitmaps()->size() > newImg) { ctrl->SetItemImage(item, newImg); }
+    //    }
 }
 
 void GitPlugin::OnClone(wxCommandEvent& e)
@@ -2214,8 +2218,8 @@ void GitPlugin::DoShowDiffViewer(const wxString& headFile, const wxString& fileN
     DiffSideBySidePanel::FileInfo l(tmpFilePath, _("HEAD version"), true);
     l.deleteOnExit = true;
     DiffSideBySidePanel::FileInfo r(fnWorkingCopy.GetFullPath(), _("Working copy"), false);
-    clDiffFrame* diffView = new clDiffFrame(EventNotifier::Get()->TopFrame(), l, r, true);
-    diffView->Show();
+    clDiffFrame diffView(EventNotifier::Get()->TopFrame(), l, r, true);
+    diffView.ShowModal();
 }
 
 void GitPlugin::OnRebase(wxCommandEvent& e)
@@ -2618,3 +2622,22 @@ void GitPlugin::OnAppActivated(wxCommandEvent& event)
 }
 
 bool GitPlugin::IsGitEnabled() const { return !m_repositoryDirectory.IsEmpty(); }
+
+void GitPlugin::OnFileCreated(clFileSystemEvent& event)
+{
+    event.Skip();
+    if(IsGitEnabled()) {
+        // A file was created on the file system, add it to git if needed
+        const wxString& filepath = event.GetPath();
+        wxArrayString files;
+        files.Add(filepath);
+        DoAddFiles(files);
+        RefreshFileListView();
+    }
+}
+
+void GitPlugin::OnReplaceInFiles(clFileSystemEvent& event)
+{
+    event.Skip();
+    DoRefreshView(false);
+}

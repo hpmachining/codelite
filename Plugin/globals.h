@@ -39,6 +39,7 @@
 #include <wx/propgrid/propgrid.h>
 #include <wx/string.h>
 #include <wx/variant.h>
+#include <wx/infobar.h>
 
 class wxDataViewCtrl;
 class IManager;
@@ -615,4 +616,14 @@ WXDLLIMPEXP_SDK void clFitColumnWidth(wxDataViewCtrl* ctrl);
  */
 WXDLLIMPEXP_SDK wxSize clGetDisplaySize();
 
+/**
+ * @brief returna top level window best size using its parent's size as reference
+ */
+WXDLLIMPEXP_SDK void clSetTLWindowBestSizeAndPosition(wxWindow* win);
+
+/**
+ * @brief set dialog best size and position
+ * @param win
+ */
+WXDLLIMPEXP_SDK void clSetDialogBestSizeAndPosition(wxDialog* win);
 #endif // GLOBALS_H

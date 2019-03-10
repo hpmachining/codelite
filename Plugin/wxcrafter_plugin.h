@@ -7,32 +7,33 @@
 #ifndef _CODELITE_PLUGIN_WXCRAFTER_BASE_CLASSES_H
 #define _CODELITE_PLUGIN_WXCRAFTER_BASE_CLASSES_H
 
-#include "clFileViwerTreeCtrl.h"
-#include "clThemedListCtrl.h"
-#include <wx/artprov.h>
-#include <wx/button.h>
-#include <wx/dataview.h>
-#include <wx/dialog.h>
-#include <wx/frame.h>
-#include <wx/iconbndl.h>
-#include <wx/listbox.h>
-#include <wx/panel.h>
-#include <wx/scrolwin.h>
 #include <wx/settings.h>
-#include <wx/sizer.h>
-#include <wx/splitter.h>
-#include <wx/srchctrl.h>
-#include <wx/statbmp.h>
-#include <wx/stattext.h>
-#include <wx/stc/stc.h>
-#include <wx/textctrl.h>
-#include <wx/treectrl.h>
-#include <wx/xrc/xh_bmp.h>
 #include <wx/xrc/xmlres.h>
+#include <wx/xrc/xh_bmp.h>
+#include <wx/dialog.h>
+#include <wx/iconbndl.h>
+#include <wx/artprov.h>
+#include <wx/sizer.h>
+#include <wx/stc/stc.h>
+#include <wx/button.h>
+#include <wx/panel.h>
+#include <wx/splitter.h>
+#include <wx/textctrl.h>
+#include <wx/stattext.h>
+#include <wx/treectrl.h>
+#include "clFileViwerTreeCtrl.h"
+#include <wx/dataview.h>
+#include "clThemedListCtrl.h"
+#include <wx/srchctrl.h>
+#include <wx/scrolwin.h>
+#include <wx/statbmp.h>
+#include "clThemedButton.h"
+#include <wx/frame.h>
+#include <wx/listbox.h>
 #if wxVERSION_NUMBER >= 2900
 #include <wx/persist.h>
-#include <wx/persist/bookctrl.h>
 #include <wx/persist/toplevel.h>
+#include <wx/persist/bookctrl.h>
 #include <wx/persist/treebook.h>
 #endif
 
@@ -166,7 +167,7 @@ public:
     wxPanel* GetPanel161() { return m_panel161; }
     NotebookNavigationDlgBase(wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Select Tab"),
                               const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize(400, 200),
-                              long style = wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
+                              long style = wxRESIZE_BORDER);
     virtual ~NotebookNavigationDlgBase();
 };
 
@@ -228,13 +229,20 @@ public:
 class WXDLLIMPEXP_SDK clEditorBarBase : public wxPanel
 {
 protected:
+    clThemedButton* m_buttonScope;
+    clThemedButton* m_buttonFilePath;
+    clThemedButton* m_buttonBookmarks;
+
 protected:
-    virtual void OnPaint(wxPaintEvent& event) { event.Skip(); }
-    virtual void OnEraseBG(wxEraseEvent& event) { event.Skip(); }
     virtual void OnEditorSize(wxSizeEvent& event) { event.Skip(); }
-    virtual void OnLeftDown(wxMouseEvent& event) { event.Skip(); }
+    virtual void OnButtonScope(wxCommandEvent& event) { event.Skip(); }
+    virtual void OnButtonActions(wxCommandEvent& event) { event.Skip(); }
+    virtual void OnButtonBookmarks(wxCommandEvent& event) { event.Skip(); }
 
 public:
+    clThemedButton* GetButtonScope() { return m_buttonScope; }
+    clThemedButton* GetButtonFilePath() { return m_buttonFilePath; }
+    clThemedButton* GetButtonBookmarks() { return m_buttonBookmarks; }
     clEditorBarBase(wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition,
                     const wxSize& size = wxSize(-1, -1), long style = wxTAB_TRAVERSAL);
     virtual ~clEditorBarBase();

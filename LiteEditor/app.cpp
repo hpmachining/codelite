@@ -59,6 +59,7 @@
 #include <wx/regex.h>
 #include "fileexplorer.h"
 #include "workspace_pane.h"
+#include "clSystemSettings.h"
 
 //#define __PERFORMANCE
 #include "performance.h"
@@ -247,7 +248,6 @@ CodeLiteApp::CodeLiteApp(void)
     , m_startedInDebuggerMode(false)
 {
 }
-
 CodeLiteApp::~CodeLiteApp(void)
 {
     wxImage::CleanUpHandlers();
@@ -292,7 +292,7 @@ bool CodeLiteApp::OnInit()
 
 #endif
     wxSocketBase::Initialize();
-
+    
     // Redirect all error messages to stderr
     wxLog::SetActiveTarget(new wxLogStderr());
 
@@ -532,7 +532,9 @@ bool CodeLiteApp::OnInit()
         wxFileName::Mkdir(clStandardPaths::Get().GetUserDataDir(), wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL);
     }
 #endif
-
+    
+    clSystemSettings::Get(); // Initialise the custom settings _before_ we start constructing the main frame
+    
     Manager* mgr = ManagerST::Get();
     EditorConfig* cfg = EditorConfigST::Get();
     cfg->SetInstallDir(mgr->GetInstallDir());
@@ -649,7 +651,7 @@ bool CodeLiteApp::OnInit()
     // Merge the user settings with any new settings
     ColoursAndFontsManager::Get().ImportLexersFile(wxFileName(clStandardPaths::Get().GetLexersDir(), "lexers.json"),
                                                    false);
-
+    
     // Create the main application window
     clMainFrame::Initialize((parser.GetParamCount() == 0) && !IsStartedInDebuggerMode());
     m_pMainFrame = clMainFrame::Get();
@@ -756,7 +758,7 @@ bool CodeLiteApp::IsSingleInstance(const wxCmdLineParser& parser)
                 bool dummy;
                 client.ConnectRemote("127.0.0.1", SINGLE_INSTANCE_PORT, dummy);
 
-                JSONRoot json(cJSON_Object);
+                JSON json(cJSON_Object);
                 json.toElement().addProperty("args", files);
                 client.WriteMessage(json.toElement().format());
                 return false;

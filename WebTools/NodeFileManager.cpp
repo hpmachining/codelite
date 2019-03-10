@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <wx/filename.h>
 #include <wx/uri.h>
+#include <wx/regex.h>
+#include <wx/filesys.h>
 
 NodeFileManager::NodeFileManager() {}
 
@@ -76,20 +78,6 @@ wxString NodeFileManager::DoGetFilePath(const wxString& id) const
     return iter->second;
 }
 
-wxString NodeFileManager::URIToFileName(const wxString& uri)
-{
-    wxString filename = wxURI::Unescape(uri);
-    filename.StartsWith(FILE_SCHEME, &filename);
-    return wxFileName(filename).GetFullPath();
-}
+wxString NodeFileManager::URIToFileName(const wxString& uri) { return wxFileSystem::URLToFileName(uri).GetFullPath(); }
 
-wxString NodeFileManager::FileNameToURI(const wxString& uri)
-{
-#ifdef __WXOSX__
-    wxString filename;
-    filename << "file://" << uri;
-    return filename;
-#else
-    return uri;
-#endif
-}
+wxString NodeFileManager::FileNameToURI(const wxString& uri) { return wxFileSystem::FileNameToURL(wxFileName(uri)); }

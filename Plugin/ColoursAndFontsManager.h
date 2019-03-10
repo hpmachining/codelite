@@ -65,23 +65,32 @@ private:
 
     void LoadOldXmls(const std::vector<wxXmlDocument*>& xmlFiles, bool userLexers = false);
     LexerConf::Ptr_t DoAddLexer(wxXmlNode* node);
-    LexerConf::Ptr_t DoAddLexer(JSONElement json);
+    LexerConf::Ptr_t DoAddLexer(JSONItem json);
     void Clear();
     wxFileName GetConfigFile() const;
     void LoadJSON(const wxFileName& path);
 
+protected:
+    void OnAdjustTheme(clCommandEvent& event);
+
 public:
     static ColoursAndFontsManager& Get();
+    
+    /**
+     * @brief return a suitable background colour that matches the lexer's bg colour
+     */
+    wxColour GetBackgroundColourFromLexer(LexerConf::Ptr_t lexer) const;
+
     /**
      * @brief Export themes to JSON file
      */
     bool ExportThemesToFile(const wxFileName& outputFile, const wxArrayString& names = wxArrayString()) const;
-    
+
     /**
      * @brief import lexers from configuration file
      */
     bool ImportLexersFile(const wxFileName& inputFile, bool prompt = true);
-    
+
     /**
      * @brief save the global settings
      */
@@ -139,7 +148,7 @@ public:
      * @brief return an array of available lexers
      */
     wxArrayString GetAllLexersNames() const;
-    
+
     /**
      * @brief return list of all themes
      */

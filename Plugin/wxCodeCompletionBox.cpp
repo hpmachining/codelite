@@ -42,38 +42,61 @@ wxCodeCompletionBox::wxCodeCompletionBox(wxWindow* parent, wxEvtHandler* eventOb
     SetBackgroundStyle(wxBG_STYLE_PAINT);
     // Use the active editor's font (if any)
     IEditor* editor = clGetManager()->GetActiveEditor();
-    if(editor) {
-        m_ccFont = editor->GetCtrl()->StyleGetFont(0);
-    } else {
-        // Default
-        m_ccFont = DrawingUtils::GetDefaultFixedFont();
-    }
+    m_ccFont = DrawingUtils::GetBestFixedFont(editor);
     SetCursor(wxCURSOR_HAND);
 
     // Set the default bitmap list
     BitmapLoader* bmpLoader = clGetManager()->GetStdIcons();
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/class"));              // 0
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/struct"));             // 1
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/namespace"));          // 2
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/member_public"));      // 3
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/typedef"));            // 4
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/member_private"));     // 5
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/member_public"));      // 6
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/member_protected"));   // 7
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/function_private"));   // 8
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/function_public"));    // 9
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/function_protected")); // 10
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/typedef"));            // 11
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/enum"));               // 12
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/enumerator"));         // 13
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("mime/16/cpp"));              // 14
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("mime/16/h"));                // 15
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("mime/16/text"));             // 16
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/cpp_keyword"));        // 17
-    m_bitmaps.push_back(bmpLoader->LoadBitmap("cc/16/enum"));               // 18
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("class")); // 0
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindClass, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("struct")); // 1
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindStruct, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("namespace")); // 2
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindModule, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("member_public")); // 3
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindVariable, m_bitmaps.size() - 1 });
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindField, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("typedef")); // 4
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindReference, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("member_private")); // 5
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindVariable, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("member_public")); // 6
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindVariable, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("member_protected")); // 7
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindVariable, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("function_private")); // 8
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("function_public"));  // 9
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindFunction, m_bitmaps.size() - 1 });
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindMethod, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("function_protected")); // 10
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("macro")); // 11
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindText, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("enum")); // 12
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindEnum, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("enumerator")); // 13
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindValue, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("mime-cpp"));    // 14
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("mime-h"));      // 15
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("mime-text"));   // 16
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("cpp_keyword")); // 17
+    m_lspCompletionItemImageIndexMap.insert({ LSP::CompletionItem::kKindKeyword, m_bitmaps.size() - 1 });
+
+    m_bitmaps.push_back(bmpLoader->LoadBitmap("enum")); // 18
 
     InitializeDefaultBitmaps();
-
     // Set the control width
     {
         wxMemoryDC memDC;
@@ -106,12 +129,18 @@ wxCodeCompletionBox::wxCodeCompletionBox(wxWindow* parent, wxEvtHandler* eventOb
 
     // Default colorus
     clColours colours = DrawingUtils::GetColours();
+
     m_useLightColours = true;
     if(editor) {
         wxColour bgColour = editor->GetCtrl()->StyleGetBackground(0);
-        colours.InitFromColour(bgColour);
-        m_useLightColours = !DrawingUtils::IsDark(bgColour);
+        if(DrawingUtils::IsDark(bgColour)) {
+            colours.InitFromColour(bgColour);
+            m_useLightColours = !DrawingUtils::IsDark(bgColour);
+        } else {
+            colours.InitFromColour(wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
+        }
     }
+
     // Default colours
     m_bgColour = colours.GetBgColour();
     m_penColour = colours.GetBorderColour();
@@ -356,7 +385,7 @@ void wxCodeCompletionBox::DoDisplayTipWindow()
             m_displayedTip = docComment;
 
             // Construct a new tip window and display the tip
-            m_tipWindow = new CCBoxTipWindow(GetParent(), docComment, 1, false);
+            m_tipWindow = new CCBoxTipWindow(GetParent(), true, docComment, 1, false);
             m_tipWindow->PositionRelativeTo(this, m_stc->PointFromPosition(m_stc->GetCurrentPos()));
 
             // restore focus to the editor
@@ -443,7 +472,7 @@ int wxCodeCompletionBox::GetSingleLineHeight() const
     gcdc.SetFont(m_ccFont);
     m_canvas->PrepareDC(gcdc);
     wxSize size = gcdc.GetTextExtent("Tp");
-    int singleLineHeight = size.y + (2 * Y_SPACER) + clGetScaledSize(2); // the extra pixel is for the border line
+    int singleLineHeight = size.y + (2 * Y_SPACER) + 2; // the extra pixel is for the border line
     return singleLineHeight;
 }
 
@@ -823,4 +852,32 @@ wxString wxCodeCompletionBox::GetFilter()
     int end = m_stc->GetCurrentPos();
 
     return m_stc->GetTextRange(start, end);
+}
+
+void wxCodeCompletionBox::ShowCompletionBox(wxStyledTextCtrl* ctrl, const LSP::CompletionItem::Vec_t& completions)
+{
+    ShowCompletionBox(ctrl, LSPCompletionsToEntries(completions));
+}
+
+wxCodeCompletionBoxEntry::Vec_t
+wxCodeCompletionBox::LSPCompletionsToEntries(const LSP::CompletionItem::Vec_t& completions)
+{
+    wxCodeCompletionBoxEntry::Vec_t entries;
+    for(size_t i = 0; i < completions.size(); ++i) {
+        LSP::CompletionItem::Ptr_t completion = completions[i];
+        wxString text = completion->GetLabel();
+        int imgIndex = GetImageId(completion);
+        wxCodeCompletionBoxEntry::Ptr_t entry = wxCodeCompletionBoxEntry::New(text, imgIndex);
+        entry->SetComment(completion->GetDetail());
+        entries.push_back(entry);
+    }
+    return entries;
+}
+
+int wxCodeCompletionBox::GetImageId(LSP::CompletionItem::Ptr_t entry) const
+{
+    if(m_lspCompletionItemImageIndexMap.count(entry->GetKind())) {
+        return m_lspCompletionItemImageIndexMap.find(entry->GetKind())->second;
+    }
+    return m_lspCompletionItemImageIndexMap.find(LSP::CompletionItem::kKindText)->second;
 }

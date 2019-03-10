@@ -34,9 +34,11 @@
 #include "wx/xml/xml.h"
 #include "wx/filename.h"
 #include "build_system.h"
-#include "json_node.h"
+#include "JSON.h"
 #include "cl_config.h"
 #include <map>
+#include <wxStringHash.h>
+#include <macros.h>
 
 // Cookie class for the editor to provide reentrance operations
 // on various methods (such as iteration)
@@ -65,7 +67,7 @@ class WXDLLIMPEXP_SDK BuildSettingsConfig
     wxXmlDocument* m_doc;
     wxFileName m_fileName;
     wxString m_version;
-    std::map<wxString, CompilerPtr> m_compilers;
+    std::unordered_map<wxString, CompilerPtr> m_compilers;
 
 protected:
     wxXmlNode* GetCompilerNode(const wxString& name) const;
@@ -75,6 +77,11 @@ protected:
 public:
     BuildSettingsConfig();
     virtual ~BuildSettingsConfig();
+
+    /**
+     * @brief return a map for the available compilers and their global include paths
+     */
+    std::unordered_map<wxString, wxArrayString> GetCompilersGlobalPaths() const;
 
     /**
      * Load the configuration file
@@ -92,14 +99,14 @@ public:
      * @brief return list of all compiler names
      */
     wxArrayString GetAllCompilersNames() const;
-    
+
     /**
      * @brief return vector with all compilers defined
-     * @param family the compiler family. Leave empty to get list of 
+     * @param family the compiler family. Leave empty to get list of
      * all compilers regardless their family
      */
     CompilerPtrVec_t GetAllCompilers(const wxString& family = "") const;
-    
+
     /**
      * @brief replace the current compilers list with a new one
      */

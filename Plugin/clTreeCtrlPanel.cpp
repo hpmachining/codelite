@@ -30,11 +30,8 @@ clTreeCtrlPanel::clTreeCtrlPanel(wxWindow* parent)
     , m_newfileTemplateHighlightLen(wxStrlen("Untitled"))
     , m_options(kShowHiddenFiles | kShowHiddenFolders | kLinkToEditor)
 {
-    SetConfig(&clConfig::Get());
     ::MSWSetNativeTheme(GetTreeCtrl());
     m_bmpLoader = clGetManager()->GetStdIcons();
-
-    m_options = GetConfig()->Read("FileExplorer/Options", m_options);
     GetTreeCtrl()->SetFont(DrawingUtils::GetDefaultGuiFont());
 
     m_toolbar = new clToolBar(this);
@@ -55,7 +52,7 @@ clTreeCtrlPanel::clTreeCtrlPanel(wxWindow* parent)
 
     EventNotifier::Get()->Bind(wxEVT_ACTIVE_EDITOR_CHANGED, &clTreeCtrlPanel::OnActiveEditorChanged, this);
     EventNotifier::Get()->Bind(wxEVT_INIT_DONE, &clTreeCtrlPanel::OnInitDone, this);
-    EventNotifier::Get()->Bind(wxEVT_CMD_FIND_IN_FILES_SHOWING, &clTreeCtrlPanel::OnFindInFilesShowing, this);
+    EventNotifier::Get()->Bind(wxEVT_FINDINFILES_DLG_SHOWING, &clTreeCtrlPanel::OnFindInFilesShowing, this);
     m_defaultView = new clTreeCtrlPanelDefaultPage(this);
     GetSizer()->Add(m_defaultView, 1, wxEXPAND);
     GetTreeCtrl()->Hide();
@@ -68,7 +65,7 @@ clTreeCtrlPanel::~clTreeCtrlPanel()
     m_toolbar->Unbind(wxEVT_UPDATE_UI, &clTreeCtrlPanel::OnLinkEditorUI, this, XRCID("link_editor"));
     EventNotifier::Get()->Unbind(wxEVT_ACTIVE_EDITOR_CHANGED, &clTreeCtrlPanel::OnActiveEditorChanged, this);
     EventNotifier::Get()->Unbind(wxEVT_INIT_DONE, &clTreeCtrlPanel::OnInitDone, this);
-    EventNotifier::Get()->Unbind(wxEVT_CMD_FIND_IN_FILES_SHOWING, &clTreeCtrlPanel::OnFindInFilesShowing, this);
+    EventNotifier::Get()->Unbind(wxEVT_FINDINFILES_DLG_SHOWING, &clTreeCtrlPanel::OnFindInFilesShowing, this);
 }
 
 void clTreeCtrlPanel::OnContextMenu(wxTreeEvent& event)
@@ -404,6 +401,12 @@ void clTreeCtrlPanel::OnNewFile(wxCommandEvent& event)
     // Open the file in the editor
     clGetManager()->OpenFile(file.GetFullPath());
     CallAfter(&clTreeCtrlPanel::SelectItem, newFile);
+
+    // Notify about file creation
+    clFileSystemEvent fsEvent(wxEVT_FILE_CREATED);
+    fsEvent.SetPath(file.GetFullPath());
+    fsEvent.SetFileName(file.GetFullName());
+    EventNotifier::Get()->AddPendingEvent(fsEvent);
 }
 
 void clTreeCtrlPanel::OnNewFolder(wxCommandEvent& event)
@@ -426,6 +429,11 @@ void clTreeCtrlPanel::OnNewFolder(wxCommandEvent& event)
     wxTreeItemId newFile = DoAddFolder(item, file.GetPath());
     GetTreeCtrl()->SortChildren(item);
     CallAfter(&clTreeCtrlPanel::SelectItem, newFile);
+
+    // Notify about folder creation
+    clFileSystemEvent fsEvent(wxEVT_FOLDER_CREATED);
+    fsEvent.SetPath(file.GetPath());
+    EventNotifier::Get()->AddPendingEvent(fsEvent);
 }
 
 void clTreeCtrlPanel::GetSelections(wxArrayString& folders, wxArrayTreeItemIds& folderItems, wxArrayString& files,
@@ -775,9 +783,9 @@ void clTreeCtrlPanel::OnOpenShellFolder(wxCommandEvent& event)
 void clTreeCtrlPanel::OnInitDone(wxCommandEvent& event)
 {
     event.Skip();
-
     if(GetConfig()) {
         wxArrayString pinnedFolders;
+        m_options = GetConfig()->Read("FileExplorer/Options", m_options);
         pinnedFolders = GetConfig()->Read("ExplorerFolders", pinnedFolders);
         for(size_t i = 0; i < pinnedFolders.size(); ++i) {
             AddFolder(pinnedFolders.Item(i));
@@ -892,17 +900,21 @@ void clTreeCtrlPanel::OnOpenWithDefaultApplication(wxCommandEvent& event)
     }
 }
 
-void clTreeCtrlPanel::OnFindInFilesShowing(clCommandEvent& event)
+void clTreeCtrlPanel::OnFindInFilesShowing(clFindInFilesEvent& event)
 {
     event.Skip();
     if(IsShownOnScreen() && GetTreeCtrl()->HasFocus()) {
-
         wxArrayString folders, files;
         GetSelections(folders, files);
 
-        // Append the folders to the Find IN Files dialog search paths
-        wxArrayString& outPaths = event.GetStrings();
-        outPaths.insert(outPaths.end(), folders.begin(), folders.end());
+        wxString paths = event.GetTransientPaths();
+        paths.Trim().Trim(false);
+        if(!paths.IsEmpty()) { paths << "\n"; }
+        for(size_t i = 0; i < folders.size(); ++i) {
+            paths << folders.Item(i) << "\n";
+        }
+        paths.Trim();
+        event.SetTransientPaths(paths);
     }
 }
 
@@ -913,7 +925,7 @@ void clTreeCtrlPanel::OnLinkEditor(wxCommandEvent& event)
     } else {
         m_options &= ~kLinkToEditor;
     }
-    GetConfig()->Write("FileExplorer/Options", m_options);
+    if(GetConfig()) { GetConfig()->Write("FileExplorer/Options", m_options); }
 }
 
 void clTreeCtrlPanel::OnLinkEditorUI(wxUpdateUIEvent& event)
@@ -990,4 +1002,22 @@ void clTreeCtrlPanel::OnRenameFolder(wxCommandEvent& event)
     } else {
         clWARNING() << "Failed to rename folder:" << oldFullPath << "->" << newFullPath;
     }
+}
+
+void clTreeCtrlPanel::RefreshTree()
+{
+    // Close the selected folders
+    wxArrayString paths;
+    wxArrayTreeItemIds items;
+    GetTopLevelFolders(paths, items);
+
+    for(size_t i = 0; i < items.size(); ++i) {
+        bool isExpanded = GetTreeCtrl()->IsExpanded(items.Item(i));
+        DoCloseFolder(items.Item(i));
+        wxTreeItemId itemFolder = DoAddFolder(GetTreeCtrl()->GetRootItem(), paths.Item(i));
+        DoExpandItem(itemFolder, isExpanded);
+    }
+
+    GetTreeCtrl()->SortChildren(GetTreeCtrl()->GetRootItem());
+    ToggleView();
 }

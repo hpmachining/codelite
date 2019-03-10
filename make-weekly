@@ -6,8 +6,8 @@ curdir=`pwd`
 # Clear old installers
 os_name=`uname -s`
 upload_file="no"
-build_php="no"
-
+build_gtk3="no"
+wx_config_gtk3_path=""
 
 os_name=`uname -s`
 if [ ${os_name} == "Darwin" ]; then
@@ -22,25 +22,26 @@ fi
 for i in "$@"
 do
     case $i in
-        "--with-php")
-            build_php="yes"
-	    shift
-            ;;
         "--upload")
             upload_file="yes"
-	    shift
+            shift
             ;;
-	--cpu-count=*)
+        --cpu-count=*)
             cpu_count="${i#*=}"
-	    shift
-	    ;;
+            shift
+            ;;
+        --with-gtk3=*)
+            wx_config_gtk3_path="${i#*=}"
+            build_gtk3="yes"
+            shift
+            ;;
     esac
 done
 
 echo "Platform     : ${os_name}"
 echo "CPU count    : ${cpu_count}"
 echo "Upload binary: ${upload_file}"
-echo "PHP Build    : ${build_php}"
+echo "GTK3 build   : ${wx_config_gtk3_path}"
 
 # Update our source tree
 cd $curdir
@@ -51,35 +52,17 @@ if [ $? -ne 0 ]; then
     exit $?
 fi
 
-echo "Pulling wxCrafter changes..."
-cd $curdir/wxcrafter
-git pull --rebase
-if [ $? -ne 0 ]; then
-    exit $?
-fi
 cd $curdir
-
+ORIG_PATH=$PATH
+ORIG_LDPATH=$LD_LIBRARY_PATH
 linux_build() {
     mkdir -p $curdir/$1
     cd $curdir/$1 # cd to the build folder
     echo rm -fr *.deb
     rm -fr *.deb
-    PATH=.:$PATH cmake -DCMAKE_BUILD_TYPE=Release -DMAKE_DEB=1 -DCOPY_WX_LIBS=1 ..
-    make -j${cpu_count} && make package
-    if [ "${upload_file}" == "yes" ]; then
-        deb_file=`ls -lt *.deb|awk '{print $9;}'|head -n 1`
-        echo Uploading deb file ${deb_file}
-        scp ${deb_file} root@codelite.org:/var/www/html/downloads/codelite/wip
-    fi
-    cd $curdir
-}
-
-linux_build_php() {
-    mkdir -p $curdir/$1
-    cd $curdir/$1 # cd to the build folder
-    echo rm -fr *.deb
-    rm -fr *.deb
-    PATH=.:$PATH cmake -DCMAKE_BUILD_TYPE=Release -DMAKE_DEB=1 -DCOPY_WX_LIBS=1 .. -DPHP_BUILD=1
+    export PATH=$2:${ORIG_PATH}
+    export LD_LIBRARY_PATH=$2/lib:${ORIG_LDPATH}
+    cmake -DCMAKE_BUILD_TYPE=Release -DMAKE_DEB=1 -DCOPY_WX_LIBS=1 ..
     make -j${cpu_count} && make package
     if [ "${upload_file}" == "yes" ]; then
         deb_file=`ls -lt *.deb|awk '{print $9;}'|head -n 1`
@@ -100,7 +83,7 @@ if [ ${os_name} == "Darwin" ]; then
     fi
 else
     linux_build build-release
-    if [ "${build_php}" == "yes" ]; then
-        linux_build_php build-release-php
+    if [ "${build_gtk3}" == "yes" ]; then
+        linux_build build-release-gtk3 ${wx_config_gtk3_path}
     fi
 fi

@@ -65,6 +65,7 @@ protected:
     wxPropertyGridManager* m_pgMgr;
     wxPGProperty* m_pgProp26;
     wxPGProperty* m_pgPropLogging;
+    wxPGProperty* m_pgPropPortNumber;
     wxPGProperty* m_pgProp32;
     wxPGProperty* m_pgPropEcma5;
     wxPGProperty* m_pgPropEcma6;
@@ -83,9 +84,11 @@ protected:
     wxPanel* m_panel237;
     wxStaticText* m_staticText243;
     wxFilePickerCtrl* m_filePickerNodeJS;
+    wxButton* m_button361;
     wxStaticText* m_staticText247;
     wxFilePickerCtrl* m_filePickerNpm;
-    wxButton* m_buttonSuugest;
+    wxButton* m_button363;
+    wxCheckBox* m_checkBoxJSLint;
     wxStdDialogButtonSizer* m_stdBtnSizer4;
     wxButton* m_buttonCancel;
     wxButton* m_buttonOK;
@@ -95,8 +98,9 @@ protected:
     virtual void OnModified(wxCommandEvent& event) { event.Skip(); }
     virtual void OnJSValueChanged(wxPropertyGridEvent& event) { event.Skip(); }
     virtual void OnNodejsPath(wxFileDirPickerEvent& event) { event.Skip(); }
-    virtual void OnNpmPath(wxFileDirPickerEvent& event) { event.Skip(); }
     virtual void OnSuggestNodeJSPaths(wxCommandEvent& event) { event.Skip(); }
+    virtual void OnNpmPath(wxFileDirPickerEvent& event) { event.Skip(); }
+    virtual void OnLintOnSave(wxCommandEvent& event) { event.Skip(); }
     virtual void OnOKUI(wxUpdateUIEvent& event) { event.Skip(); }
     virtual void OnOK(wxCommandEvent& event) { event.Skip(); }
     virtual void OnApply(wxCommandEvent& event) { event.Skip(); }
@@ -110,13 +114,15 @@ public:
     wxPanel* GetPanel12() { return m_panel12; }
     wxStaticText* GetStaticText243() { return m_staticText243; }
     wxFilePickerCtrl* GetFilePickerNodeJS() { return m_filePickerNodeJS; }
+    wxButton* GetButton361() { return m_button361; }
     wxStaticText* GetStaticText247() { return m_staticText247; }
     wxFilePickerCtrl* GetFilePickerNpm() { return m_filePickerNpm; }
-    wxButton* GetButtonSuugest() { return m_buttonSuugest; }
+    wxButton* GetButton363() { return m_button363; }
+    wxCheckBox* GetCheckBoxJSLint() { return m_checkBoxJSLint; }
     wxPanel* GetPanel237() { return m_panel237; }
     wxNotebook* GetNotebook10() { return m_notebook10; }
     WebToolsSettingsBase(wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("WebTools Settings"),
-                         const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize(500, 300),
+                         const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize(-1, -1),
                          long style = wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     virtual ~WebToolsSettingsBase();
 };
@@ -221,7 +227,8 @@ protected:
     wxPanel* m_splitterPageWatches;
     clThemedTreeCtrl* m_treeCtrlLocals;
     wxPanel* m_splitterPageCallstack;
-    wxPanel* m_panel353;
+    wxSplitterWindow* m_splitter365;
+    wxPanel* m_splitterPage369;
     Notebook* m_notebook;
     wxPanel* m_panelCallstack;
     clThemedListCtrl* m_dvListCtrlCallstack;
@@ -229,6 +236,7 @@ protected:
     clToolBar* m_tbBreakpoints;
     clThemedListCtrl* m_dvListCtrlBreakpoints;
     wxPanel* m_panelConsole;
+    wxPanel* m_splitterPage373;
     wxPanel* m_panelOutput;
 
 protected:
@@ -245,9 +253,11 @@ public:
     clThemedListCtrl* GetDvListCtrlBreakpoints() { return m_dvListCtrlBreakpoints; }
     wxPanel* GetPanelBreakpoints() { return m_panelBreakpoints; }
     wxPanel* GetPanelConsole() { return m_panelConsole; }
-    wxPanel* GetPanelOutput() { return m_panelOutput; }
     Notebook* GetNotebook() { return m_notebook; }
-    wxPanel* GetPanel353() { return m_panel353; }
+    wxPanel* GetSplitterPage369() { return m_splitterPage369; }
+    wxPanel* GetPanelOutput() { return m_panelOutput; }
+    wxPanel* GetSplitterPage373() { return m_splitterPage373; }
+    wxSplitterWindow* GetSplitter365() { return m_splitter365; }
     wxPanel* GetSplitterPageCallstack() { return m_splitterPageCallstack; }
     wxSplitterWindow* GetSplitter271() { return m_splitter271; }
     NodeJSCliDebuggerPaneBase(wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition,

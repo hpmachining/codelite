@@ -193,7 +193,6 @@ void clControlWithItems::DoInitialize()
 {
     SetBackgroundStyle(wxBG_STYLE_PAINT);
     m_viewHeader = new clHeaderBar(this, m_colours);
-    Bind(wxEVT_SIZE, &clControlWithItems::OnSize, this);
     Bind(wxEVT_MOUSEWHEEL, &clControlWithItems::OnMouseScroll, this);
     Bind(wxEVT_SET_FOCUS, [&](wxFocusEvent& e) {
         if(m_searchControl && m_searchControl->IsShown()) { m_searchControl->Dismiss(); }
@@ -206,7 +205,6 @@ void clControlWithItems::DoInitialize()
 clControlWithItems::~clControlWithItems()
 {
     m_searchControl = nullptr;
-    Unbind(wxEVT_SIZE, &clControlWithItems::OnSize, this);
     Unbind(wxEVT_MOUSEWHEEL, &clControlWithItems::OnMouseScroll, this);
 }
 
@@ -267,14 +265,15 @@ void clControlWithItems::UpdateScrollBar()
     {
         // H-scrollbar
         int thumbSize = GetClientArea().GetWidth();
-        int pageSize = (thumbSize - 1);
         int rangeSize = IsEmpty() ? 0 : m_viewHeader->GetWidth();
+        if((m_firstColumn + thumbSize) > rangeSize) { m_firstColumn = (rangeSize - thumbSize); }
+        int pageSize = (thumbSize - 1);
         int position = m_firstColumn;
-        
+
         int pixels_after = rangeSize - m_firstColumn - thumbSize;
         if((pixels_after < 0) && (rangeSize > thumbSize)) {
-           // m_firstColumn += pixels_after; // reduce it from the left side
-            clHeaderItem& column = GetHeader()->Item(GetHeader()->size()-1);
+            // m_firstColumn += pixels_after; // reduce it from the left side
+            clHeaderItem& column = GetHeader()->Item(GetHeader()->size() - 1);
             column.UpdateWidth(column.GetWidth() - pixels_after);
         }
         if(m_firstColumn < 0) { m_firstColumn = 0; }
@@ -286,8 +285,8 @@ void clControlWithItems::UpdateScrollBar()
 void clControlWithItems::Render(wxDC& dc)
 {
     // draw the background on the entire client area
-    dc.SetPen(wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
-    dc.SetBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
+    dc.SetPen(GetColours().GetBgColour());
+    dc.SetBrush(GetColours().GetBgColour());
     dc.DrawRectangle(GetClientRect());
 
     // draw the background on the entire client area
@@ -302,6 +301,7 @@ void clControlWithItems::Render(wxDC& dc)
 void clControlWithItems::OnSize(wxSizeEvent& event)
 {
     event.Skip();
+    clScrolledPanel::OnSize(event);
     m_firstColumn = 0;
     // since the control size was resized, we turn the "m_maxList" flag to ON
     // and in turn, in the OnPaint() we will try to maximize the list displayed
@@ -314,6 +314,7 @@ void clControlWithItems::OnSize(wxSizeEvent& event)
 void clControlWithItems::ScollToColumn(int firstColumn)
 {
     m_firstColumn = firstColumn;
+    UpdateScrollBar();
     Refresh();
 }
 

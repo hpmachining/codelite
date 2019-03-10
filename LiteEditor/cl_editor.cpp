@@ -36,7 +36,6 @@
 #include "cl_command_event.h"
 #include "cl_editor.h"
 #include "cl_editor_tip_window.h"
-#include "clang_code_completion.h"
 #include "code_completion_manager.h"
 #include "codelite_events.h"
 #include "colourrequest.h"
@@ -130,6 +129,18 @@ static int ID_OPEN_URL = wxNOT_FOUND;
 #ifndef wxSTC_MARK_BOOKMARK
 #define wxSTC_MARK_BOOKMARK wxSTC_MARK_LEFTRECT
 #endif
+
+static bool IsWordChar(const wxChar& ch)
+{
+    static wxStringSet_t wordsChar;
+    if(wordsChar.empty()) {
+        wxString chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_.>";
+        for(size_t i = 0; i < chars.size(); ++i) {
+            wordsChar.insert(chars[i]);
+        }
+    }
+    return (wordsChar.count(ch) != 0);
+}
 
 //---------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------
@@ -403,6 +414,13 @@ clEditor::clEditor(wxWindow* parent)
 
 clEditor::~clEditor()
 {
+    // Report file-close event
+    if(GetFileName().IsOk() && GetFileName().FileExists()) {
+        clCommandEvent eventClose(wxEVT_FILE_CLOSED);
+        eventClose.SetFileName(GetFileName().GetFullPath());
+        EventNotifier::Get()->AddPendingEvent(eventClose);
+    }
+
     wxDELETE(m_richTooltip);
     EventNotifier::Get()->Unbind(wxEVT_EDITOR_CONFIG_CHANGED, &clEditor::OnEditorConfigChanged, this);
 
@@ -1126,7 +1144,7 @@ void clEditor::OnCharAdded(wxStyledTextEvent& event)
         if(TagsManagerST::Get()->GetCtagsOptions().GetFlags() & CC_WORD_ASSIST) {
             if(GetWordAtCaret().Len() == (size_t)TagsManagerST::Get()->GetCtagsOptions().GetMinWordLen() &&
                pos - startPos >= TagsManagerST::Get()->GetCtagsOptions().GetMinWordLen()) {
-                CompleteWord();
+                CompleteWord(LSP::CompletionItem::kTriggerKindInvoked);
             }
         }
     }
@@ -1556,17 +1574,6 @@ bool clEditor::SaveToFile(const wxFileName& fileName)
                 bSaveSucceeded = true;
             }
         }
-#if HAS_LIBCLANG
-        if(!bSaveSucceeded) {
-            // Try clearing the clang cache and try again
-            ClangCodeCompletion::Instance()->ClearCache();
-            if(!::wxRenameFile(intermediateFile.GetFullPath(), symlinkedFile.GetFullPath(), true)) {
-                wxMessageBox(wxString::Format(_("Failed to override read-only file")), "CodeLite",
-                             wxOK | wxICON_WARNING);
-                return false;
-            }
-        }
-#endif
     }
 #else
     if(!::wxRenameFile(intermediateFile.GetFullPath(), symlinkedFile.GetFullPath(), true)) {
@@ -1619,14 +1626,7 @@ void clEditor::UpdateBreakpoints()
     }
 }
 
-wxString clEditor::GetWordAtCaret()
-{
-    // Get the partial word that we have
-    long pos = GetCurrentPos();
-    long start = WordStartPosition(pos, true);
-    long end = WordEndPosition(pos, true);
-    return GetTextRange(start, end);
-}
+wxString clEditor::GetWordAtCaret(bool wordCharsOnly) { return GetWordAtPosition(GetCurrentPos(), wordCharsOnly); }
 
 //---------------------------------------------------------------------------
 // Most of the functionality for this functionality
@@ -1635,7 +1635,7 @@ wxString clEditor::GetWordAtCaret()
 // layer (outside of the library) to provide the input arguments for
 // the CodeParser library
 //---------------------------------------------------------------------------
-void clEditor::CompleteWord(bool onlyRefresh)
+void clEditor::CompleteWord(LSP::CompletionItem::eTriggerKind triggerKind, bool onlyRefresh)
 {
     if(EventNotifier::Get()->IsEventsDiabled()) return;
     if(AutoCompActive()) return; // Don't clobber the boxes
@@ -1652,6 +1652,7 @@ void clEditor::CompleteWord(bool onlyRefresh)
                 evt.SetEditor(this);
                 evt.SetInsideCommentOrString(m_context->IsCommentOrString(PositionBefore(GetCurrentPos())));
                 evt.SetEventObject(this);
+                evt.SetTriggerKind(triggerKind);
                 EventNotifier::Get()->ProcessEvent(evt);
                 return;
             }
@@ -1663,7 +1664,7 @@ void clEditor::CompleteWord(bool onlyRefresh)
     evt.SetPosition(GetCurrentPosition());
     evt.SetEditor(this);
     evt.SetInsideCommentOrString(m_context->IsCommentOrString(PositionBefore(GetCurrentPos())));
-
+    evt.SetTriggerKind(triggerKind);
     evt.SetEventObject(this);
 
     if(EventNotifier::Get()->ProcessEvent(evt)) {
@@ -1691,6 +1692,7 @@ void clEditor::CodeComplete(bool refreshingList)
     if(!refreshingList) {
         clCodeCompletionEvent evt(wxEVT_CC_CODE_COMPLETE);
         evt.SetPosition(GetCurrentPosition());
+        evt.SetTriggerKind(LSP::CompletionItem::kTriggerCharacter);
         evt.SetInsideCommentOrString(m_context->IsCommentOrString(PositionBefore(GetCurrentPos())));
         evt.SetEventObject(this);
         evt.SetEditor(this);
@@ -1705,7 +1707,7 @@ void clEditor::CodeComplete(bool refreshingList)
         }
 
     } else {
-        CompleteWord();
+        CompleteWord(LSP::CompletionItem::kTriggerCharacter);
     }
 }
 
@@ -1769,18 +1771,18 @@ void clEditor::OnDwellStart(wxStyledTextEvent& event)
             GetBookmarkTooltip(line, tooltip, title);
         }
 
+        bool compilerMarker = false;
         // Compiler marker takes precedence over any other tooltip on that margin
         if((MarkerGet(line) & mmt_compiler) && m_compilerMessagesMap.count(line)) {
+            compilerMarker = true;
             // Get the compiler tooltip
             tooltip = m_compilerMessagesMap.find(line)->second;
-            if(MarkerGet(line) & (1 << smt_warning)) {
-                title = "<color=\"yellow\">WARNING</color>";
-            } else {
-                title = "<color=\"pink\">ERROR</color>";
-            }
         }
 
-        if(!title.IsEmpty() && !tooltip.IsEmpty()) { DoShowCalltip(-1, title, tooltip); }
+        if(!tooltip.IsEmpty()) {
+            // if the marker is a compiler marker, dont manipulate the text
+            DoShowCalltip(-1, title, tooltip, !compilerMarker);
+        }
 
     } else if(ManagerST::Get()->DbgCanInteract() && clientRect.Contains(pt)) {
         m_context->OnDbgDwellStart(event);
@@ -1797,7 +1799,7 @@ void clEditor::OnDwellStart(wxStyledTextEvent& event)
 
         if(EventNotifier::Get()->ProcessEvent(evtTypeinfo)) {
             // Did the user provide a tooltip?
-            if(!evtTypeinfo.GetTooltip().IsEmpty()) { DoShowCalltip(wxNOT_FOUND, "", evtTypeinfo.GetTooltip()); }
+            if(!evtTypeinfo.GetTooltip().IsEmpty()) { DoShowCalltip(wxNOT_FOUND, "", evtTypeinfo.GetTooltip(), true); }
         } else {
             m_context->OnDwellStart(event);
         }
@@ -3263,9 +3265,7 @@ void clEditor::OnKeyDown(wxKeyEvent& event)
         wxPoint pt = ScreenToClient(wxGetMousePosition());
         int pos = PositionFromPointClose(pt.x, pt.y);
         if(pos != wxNOT_FOUND) {
-            int wordStart = WordStartPos(pos, true);
-            int wordEnd = WordEndPos(pos, true);
-            wxString wordAtMouse = GetTextRange(wordStart, wordEnd);
+            wxString wordAtMouse = GetWordAtPosition(pos, false);
             if(!wordAtMouse.IsEmpty()) {
                 // clLogMessage("Event wxEVT_DBG_EXPR_TOOLTIP is fired for string: %s", wordAtMouse);
                 clDebugEvent tipEvent(wxEVT_DBG_EXPR_TOOLTIP);
@@ -4248,7 +4248,7 @@ wxString clEditor::GetEolString()
     return eol;
 }
 
-void clEditor::DoShowCalltip(int pos, const wxString& title, const wxString& tip)
+void clEditor::DoShowCalltip(int pos, const wxString& title, const wxString& tip, bool manipulateText)
 {
     DoCancelCalltip();
     wxPoint pt;
@@ -4257,7 +4257,7 @@ void clEditor::DoShowCalltip(int pos, const wxString& title, const wxString& tip
     tooltip.Trim().Trim(false);
     if(!tooltip.IsEmpty()) { tooltip << "\n<hr>"; }
     tooltip << tip;
-    m_calltip = new CCBoxTipWindow(this, tooltip);
+    m_calltip = new CCBoxTipWindow(this, manipulateText, tooltip);
     if(pos == wxNOT_FOUND) {
         pt = ::wxGetMousePosition();
     } else {
@@ -4485,6 +4485,22 @@ void clEditor::OnRemoveMatchInidicator(wxCommandEvent& e)
 bool clEditor::FindAndSelect(const wxString& pattern, const wxString& what, int pos, NavMgr* navmgr)
 {
     return DoFindAndSelect(pattern, what, pos, navmgr);
+}
+
+bool clEditor::SelectRange(const LSP::Range& range)
+{
+    BrowseRecord jumpfrom = CreateBrowseRecord();
+    ClearSelections();
+    int startPos = PositionFromLine(range.GetStart().GetLine());
+    startPos += range.GetStart().GetCharacter();
+
+    int endPos = PositionFromLine(range.GetEnd().GetLine());
+    endPos += range.GetEnd().GetCharacter();
+    CenterLine(LineFromPosition(startPos), GetColumn(startPos));
+    SetSelectionStart(startPos);
+    SetSelectionEnd(endPos);
+    NavMgr::Get()->AddJump(jumpfrom, CreateBrowseRecord());
+    return true;
 }
 
 bool clEditor::DoFindAndSelect(const wxString& _pattern, const wxString& what, int start_pos, NavMgr* navmgr)
@@ -5510,6 +5526,11 @@ void clEditor::ReloadFromDisk(bool keepUndoHistory)
     }
 
     SetReloadingFile(false);
+
+    // Notify about file-reload
+    clCommandEvent e(wxEVT_FILE_LOADED);
+    e.SetFileName(GetFileName().GetFullPath());
+    EventNotifier::Get()->AddPendingEvent(e);
 }
 
 void clEditor::PreferencesChanged()
@@ -5531,10 +5552,40 @@ void clEditor::NotifyMarkerChanged(int lineNumber)
     EventNotifier::Get()->AddPendingEvent(eventMarker);
 }
 
+wxString clEditor::GetWordAtPosition(int pos, bool wordCharsOnly)
+{
+    // Get the partial word that we have
+    if(wordCharsOnly) {
+        long start = WordStartPosition(pos, true);
+        long end = WordEndPosition(pos, true);
+        return GetTextRange(start, end);
+
+    } else {
+        int start = pos;
+        int end = pos;
+        int where = pos;
+        // find the start pos
+        while(true) {
+            int p = PositionBefore(where);
+            if((p != wxNOT_FOUND) && IsWordChar(GetCharAt(p))) {
+                where = p;
+                if(where == 0) { break; }
+                continue;
+            } else {
+                break;
+            }
+        }
+        wxSwap(start, where);
+        end = WordEndPosition(pos, true);
+        return GetTextRange(start, end);
+    }
+}
+
 int clEditor::GetFirstNonWhitespacePos(bool backward)
 {
     int from = GetCurrentPos();
     if(from == wxNOT_FOUND) { return wxNOT_FOUND; }
+
     int pos = from;
     if(backward) {
         from = PositionBefore(from);

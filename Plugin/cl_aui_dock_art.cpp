@@ -37,6 +37,7 @@
 #include <wx/dcmemory.h>
 #include <wx/settings.h>
 #include <wx/xrc/xmlres.h>
+#include "clSystemSettings.h"
 
 // --------------------------------------------
 
@@ -67,9 +68,9 @@ static wxString wxAuiChopText(wxDC& dc, const wxString& text, int max_size)
 
 static void clDockArtGetColours(wxColour& bgColour, wxColour& penColour)
 {
-    bgColour = wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE);
+    bgColour = clSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE);
     bgColour = bgColour.ChangeLightness(80);
-    penColour = wxSystemSettings::GetColour(wxSYS_COLOUR_BTNTEXT);
+    penColour = clSystemSettings::GetColour(wxSYS_COLOUR_BTNTEXT);
 }
 
 // ------------------------------------------------------------
@@ -78,30 +79,20 @@ clAuiDockArt::clAuiDockArt(IManager* manager)
     : m_manager(manager)
 {
     EventNotifier::Get()->Bind(wxEVT_EDITOR_CONFIG_CHANGED, &clAuiDockArt::OnSettingsChanged, this);
-    m_useDarkColours = EditorConfigST::Get()->GetOptions()->IsTabColourDark();
     m_captionColour = DrawingUtils::GetCaptionColour();
     m_captionTextColour = DrawingUtils::GetCaptionTextColour();
     m_useCustomCaptionColour = clConfig::Get().Read("UseCustomCaptionsColour", false);
 
-    m_darkBgColour = wxColour("rgb(80,80,80)");
-#ifdef __WXOSX__
-    m_notebookTabAreaDarkBgColour = *wxBLACK;
-#else
-    m_notebookTabAreaDarkBgColour = wxColour("rgb(37,22,22)"); //.ChangeLightness(115);
-#endif
-    m_notebookTabAreaDarkBgColour = m_darkBgColour;
-
-    if(m_useDarkColours) {
-        m_dockCloseBmp = wxXmlResource::Get()->LoadBitmap("aui-close-white");
-        m_dockMoreBmp = wxXmlResource::Get()->LoadBitmap("aui-more-white");
-        m_dockExpandeBmp = wxXmlResource::Get()->LoadBitmap("aui-expand-white");
-        m_dockMinimizeBmp = wxXmlResource::Get()->LoadBitmap("aui-minimize-white");
-    } else {
-        m_dockCloseBmp = wxXmlResource::Get()->LoadBitmap("aui-close");
-        m_dockMoreBmp = wxXmlResource::Get()->LoadBitmap("aui-more");
-        m_dockExpandeBmp = wxXmlResource::Get()->LoadBitmap("aui-expand");
-        m_dockMinimizeBmp = wxXmlResource::Get()->LoadBitmap("aui-minimize");
-    }
+    m_bgColour = DrawingUtils::GetPanelBgColour();
+    EventNotifier::Get()->Bind(wxEVT_CMD_COLOURS_FONTS_UPDATED, [&](clCommandEvent& event) {
+        event.Skip();
+        m_bgColour = DrawingUtils::GetPanelBgColour();
+        bool useCustomColour = clConfig::Get().Read("UseCustomBaseColour", false);
+        if(useCustomColour) { m_bgColour = clConfig::Get().Read("BaseColour", m_bgColour); }
+        
+        // Trigger a refresh
+        m_manager->GetDockingManager()->Update();
+    });
 }
 
 clAuiDockArt::~clAuiDockArt()
@@ -140,7 +131,7 @@ void clAuiDockArt::DrawPaneButton(wxDC& dc, wxWindow* window, int button, int bu
     // Prepare the colours
     wxColour bgColour, penColour;
     clDockArtGetColours(bgColour, penColour);
-    
+
     switch(button) {
     case wxAUI_BUTTON_CLOSE:
         DrawingUtils::DrawButtonX(dc, window, buttonRect, penColour, bgColour, buttonState);
@@ -219,10 +210,10 @@ void clAuiDockArt::DrawCaption(wxDC& dc, wxWindow* window, const wxString& text,
 
         wxFont f = DrawingUtils::GetDefaultGuiFont();
         pDC->SetFont(f);
-        
+
         wxColour captionBgColour, textColour;
         clDockArtGetColours(captionBgColour, textColour);
-    
+
         pDC->SetPen(captionBgColour);
         pDC->SetBrush(captionBgColour);
         pDC->DrawRectangle(tmpRect);
@@ -255,55 +246,31 @@ void clAuiDockArt::DrawBackground(wxDC& dc, wxWindow* window, int orientation, c
 {
     wxUnusedVar(window);
     wxUnusedVar(orientation);
-    dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.SetBrush(m_useDarkColours ? m_notebookTabAreaDarkBgColour : DrawingUtils::GetPanelBgColour());
+    dc.SetPen(m_bgColour);
+    dc.SetBrush(m_bgColour);
     dc.DrawRectangle(rect);
 }
 
 void clAuiDockArt::DrawBorder(wxDC& dc, wxWindow* window, const wxRect& rect, wxAuiPaneInfo& pane)
 {
-    wxColour penColour = DrawingUtils::GetPanelBgColour();
-    penColour = m_useDarkColours ? m_notebookTabAreaDarkBgColour : penColour;
-    dc.SetPen(penColour);
+    dc.SetPen(m_bgColour);
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRectangle(rect);
 }
 
 void clAuiDockArt::DrawSash(wxDC& dc, wxWindow* window, int orientation, const wxRect& rect)
 {
-    if(m_useDarkColours) {
-        wxUnusedVar(window);
-        wxUnusedVar(orientation);
-        dc.SetPen(*wxTRANSPARENT_PEN);
-        dc.SetBrush(m_notebookTabAreaDarkBgColour);
-        dc.DrawRectangle(rect);
-    } else {
-        wxUnusedVar(window);
-        wxUnusedVar(orientation);
-        dc.SetPen(*wxTRANSPARENT_PEN);
-        dc.SetBrush(DrawingUtils::GetPanelBgColour());
-        dc.DrawRectangle(rect);
-    }
+    wxUnusedVar(window);
+    wxUnusedVar(orientation);
+    dc.SetPen(*wxTRANSPARENT_PEN);
+    dc.SetBrush(m_bgColour);
+    dc.DrawRectangle(rect);
 }
 
 void clAuiDockArt::OnSettingsChanged(wxCommandEvent& event)
 {
     event.Skip();
-    m_useDarkColours = EditorConfigST::Get()->GetOptions()->IsTabColourDark();
     m_captionColour = DrawingUtils::GetCaptionColour();
     m_captionTextColour = DrawingUtils::GetCaptionTextColour();
     m_useCustomCaptionColour = false;
-
-    // update the bitmaps
-    if(m_useDarkColours) {
-        m_dockCloseBmp = wxXmlResource::Get()->LoadBitmap("aui-close-white");
-        m_dockMoreBmp = wxXmlResource::Get()->LoadBitmap("aui-more-white");
-        m_dockExpandeBmp = wxXmlResource::Get()->LoadBitmap("aui-expand-white");
-        m_dockMinimizeBmp = wxXmlResource::Get()->LoadBitmap("aui-minimize-white");
-    } else {
-        m_dockCloseBmp = wxXmlResource::Get()->LoadBitmap("aui-close");
-        m_dockMoreBmp = wxXmlResource::Get()->LoadBitmap("aui-more");
-        m_dockExpandeBmp = wxXmlResource::Get()->LoadBitmap("aui-expand");
-        m_dockMinimizeBmp = wxXmlResource::Get()->LoadBitmap("aui-minimize");
-    }
 }

@@ -24,13 +24,11 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #include "code_completion_manager.h"
-#include "clang_code_completion.h"
 #include "tags_options_data.h"
 #include <vector>
 #include "ctags_manager.h"
 #include "entry.h"
 #include "frame.h"
-#include "clang_compilation_db_thread.h"
 #include "compilation_database.h"
 #include "event_notifier.h"
 #include "plugin.h"
@@ -48,6 +46,8 @@
 #include "bitmap_loader.h"
 #include "wxCodeCompletionBoxManager.h"
 #include <algorithm>
+#include "manager.h"
+#include "CompileCommandsCreateor.h"
 
 static CodeCompletionManager* ms_CodeCompletionManager = NULL;
 
@@ -183,15 +183,7 @@ bool CodeCompletionManager::DoCtagsWordCompletion(clEditor* editor, const wxStri
     return false;
 }
 
-void CodeCompletionManager::DoClangWordCompletion(clEditor* editor)
-{
-#if HAS_LIBCLANG
-    DoUpdateOptions();
-    if(GetOptions() & CC_CLANG_ENABLED) ClangCodeCompletion::Instance()->WordComplete(editor);
-#else
-    wxUnusedVar(editor);
-#endif
-}
+void CodeCompletionManager::DoClangWordCompletion(clEditor* editor) { wxUnusedVar(editor); }
 
 bool CodeCompletionManager::DoCtagsCalltip(clEditor* editor, int line, const wxString& expr, const wxString& text,
                                            const wxString& word)
@@ -206,15 +198,7 @@ bool CodeCompletionManager::DoCtagsCalltip(clEditor* editor, int line, const wxS
     return true;
 }
 
-void CodeCompletionManager::DoClangCalltip(clEditor* editor)
-{
-#if HAS_LIBCLANG
-    DoUpdateOptions();
-    if(GetOptions() & CC_CLANG_ENABLED) ClangCodeCompletion::Instance()->Calltip(editor);
-#else
-    wxUnusedVar(editor);
-#endif
-}
+void CodeCompletionManager::DoClangCalltip(clEditor* editor) { wxUnusedVar(editor); }
 
 void CodeCompletionManager::Calltip(clEditor* editor, int line, const wxString& expr, const wxString& text,
                                     const wxString& word)
@@ -238,14 +222,7 @@ void CodeCompletionManager::CodeComplete(clEditor* editor, int line, const wxStr
     if(!res && (GetOptions() & CC_CLANG_ENABLED)) { DoClangCodeComplete(editor); }
 }
 
-void CodeCompletionManager::DoClangCodeComplete(clEditor* editor)
-{
-#if HAS_LIBCLANG
-    ClangCodeCompletion::Instance()->CodeComplete(editor);
-#else
-    wxUnusedVar(editor);
-#endif
-}
+void CodeCompletionManager::DoClangCodeComplete(clEditor* editor) { wxUnusedVar(editor); }
 
 bool CodeCompletionManager::DoCtagsCodeComplete(clEditor* editor, int line, const wxString& expr, const wxString& text)
 {
@@ -294,13 +271,7 @@ void CodeCompletionManager::GotoImpl(clEditor* editor)
     if(!res && (GetOptions() & CC_CLANG_ENABLED)) { DoClangGotoImpl(editor); }
 }
 
-void CodeCompletionManager::DoClangGotoImpl(clEditor* editor)
-{
-    wxUnusedVar(editor);
-#if HAS_LIBCLANG
-    ClangCodeCompletion::Instance()->GotoImplementation(editor);
-#endif
-}
+void CodeCompletionManager::DoClangGotoImpl(clEditor* editor) { wxUnusedVar(editor); }
 
 bool CodeCompletionManager::DoCtagsGotoImpl(clEditor* editor)
 {
@@ -317,13 +288,7 @@ bool CodeCompletionManager::DoCtagsGotoImpl(clEditor* editor)
     return false;
 }
 
-void CodeCompletionManager::DoClangGotoDecl(clEditor* editor)
-{
-    wxUnusedVar(editor);
-#if HAS_LIBCLANG
-    ClangCodeCompletion::Instance()->GotoDeclaration(editor);
-#endif
-}
+void CodeCompletionManager::DoClangGotoDecl(clEditor* editor) { wxUnusedVar(editor); }
 
 bool CodeCompletionManager::DoCtagsGotoDecl(clEditor* editor)
 {
@@ -365,8 +330,7 @@ void CodeCompletionManager::DoUpdateCompilationDatabase()
 {
     // Create a worker thread (detached thread) that
     // will initialize the database now that the compilation has ended
-    CompilationDatabase db;
-    ClangCompilationDbThreadST::Get()->AddFile(db.GetFileName().GetFullPath());
+    ManagerST::Get()->GenerateCompileCommands();
 }
 
 void CodeCompletionManager::OnAppActivated(wxActivateEvent& e) { e.Skip(); }
@@ -382,9 +346,7 @@ void CodeCompletionManager::OnBuildStarted(clBuildEvent& e)
 void CodeCompletionManager::OnCompileCommandsFileGenerated(clCommandEvent& event)
 {
     event.Skip();
-    CL_DEBUG("-- Code Completion Manager: process file 'compile_commands.json' file");
-    CompilationDatabase db;
-    ClangCompilationDbThreadST::Get()->AddFile(db.GetFileName().GetFullPath());
+    clDEBUG() << "-- Code Completion Manager: process file" << event.GetFileName();
     clMainFrame::Get()->SetStatusText("Ready");
 }
 
@@ -671,4 +633,9 @@ size_t CodeCompletionManager::CreateBlockCommentKeywordsList(wxCodeCompletionBox
     std::for_each(keywords.begin(), keywords.end(),
                   [&](const wxString& keyword) { entries.push_back(wxCodeCompletionBoxEntry::New(keyword, 0)); });
     return entries.size();
+}
+
+void CodeCompletionManager::UpdateParserPaths()
+{
+    if(clCxxWorkspaceST::Get()->IsOpen()) { DoProcessCompileCommands(); }
 }

@@ -54,6 +54,8 @@
 #include <wx/process.h>
 #include <wx/splash.h>
 #include <wx/minifram.h>
+#include <wx/infobar.h>
+#include "clInfoBar.h"
 
 // forward decls
 class DebuggerToolBar;
@@ -135,6 +137,7 @@ class clMainFrame : public wxFrame
     WebUpdateJob* m_webUpdate;
     clToolBar* m_toolbar;
     DebuggerToolBar* m_debuggerToolbar = nullptr;
+    clInfoBar* m_infoBar = nullptr;
 
 public:
     static bool m_initCompleted;
@@ -144,11 +147,14 @@ protected:
     void DoCreateBuildDropDownMenu(wxMenu* menu);
     void DoShowToolbars(bool show, bool update = true);
     void InitializeLogo();
-
+    
 public:
+    virtual void Raise();
     static clMainFrame* Get();
     static void Initialize(bool loadLastSession);
-
+    
+    clInfoBar* GetMessageBar() { return m_infoBar; }
+    
     /**
      * @brief goto anything..
      */
@@ -394,6 +400,7 @@ protected:
     //----------------------------------------------------
     // event handlers
     //----------------------------------------------------
+    void OnInfobarButton(wxCommandEvent& event);
     void OnDebugStarted(clDebugEvent& event);
     void OnDebugEnded(clDebugEvent& event);
 
@@ -449,6 +456,8 @@ protected:
     void OnShowStatusBarUI(wxUpdateUIEvent& event);
     void OnShowToolbar(wxCommandEvent& event);
     void OnShowToolbarUI(wxUpdateUIEvent& event);
+    void OnShowMenuBar(wxCommandEvent& event);
+    void OnShowMenuBarUI(wxUpdateUIEvent& event);
     void OnShowTabBar(wxCommandEvent& event);
     void OnShowTabBarUI(wxUpdateUIEvent& event);
     void OnProjectNewWorkspace(wxCommandEvent& event);

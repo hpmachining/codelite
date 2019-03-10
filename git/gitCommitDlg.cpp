@@ -47,8 +47,8 @@ GitCommitDlg::GitCommitDlg(wxWindow* parent, GitPlugin* plugin, const wxString& 
     GitEntry data;
     conf.ReadItem(&data);
     ::MSWSetNativeTheme(m_listBox);
-    m_splitterInner->SetSashPosition(data.GetGitCommitDlgHSashPos());
-    m_splitterMain->SetSashPosition(data.GetGitCommitDlgVSashPos());
+    m_splitterInner->CallAfter(&wxSplitterWindow::SetSashPosition, data.GetGitCommitDlgHSashPos(), true);
+    m_splitterMain->CallAfter(&wxSplitterWindow::SetSashPosition, data.GetGitCommitDlgVSashPos(), true);
 
     LexerConf::Ptr_t diffLexer = ColoursAndFontsManager::Get().GetLexer("diff");
     if(diffLexer) { diffLexer->Apply(m_stcDiff); }
@@ -57,14 +57,13 @@ GitCommitDlg::GitCommitDlg(wxWindow* parent, GitPlugin* plugin, const wxString& 
     m_toolbar->AddTool(XRCID("ID_HISTORY"), _("Show commit history"),
                        clGetManager()->GetStdIcons()->LoadBitmap("history"));
     m_toolbar->Realize();
-    SetName("GitCommitDlg");
-    WindowAttrManager::Load(this);
     LexerConf::Ptr_t lex = ColoursAndFontsManager::Get().GetLexer("text");
     lex->Apply(m_stcCommitMessage);
     m_toolbar->Bind(wxEVT_TOOL, &GitCommitDlg::OnToggleCheckAll, this, XRCID("ID_CHECKALL"));
     m_toolbar->Bind(wxEVT_TOOL, &GitCommitDlg::OnCommitHistory, this, XRCID("ID_HISTORY"));
     m_editEventsHandlerCommitStc.Reset(new clEditEventsHandler(m_stcCommitMessage));
     m_editEventsHandlerDiffStc.Reset(new clEditEventsHandler(m_stcDiff));
+    ::clSetTLWindowBestSizeAndPosition(this);
 }
 
 /*******************************************************************************/

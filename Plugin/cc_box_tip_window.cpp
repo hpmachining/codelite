@@ -41,6 +41,7 @@
 #include <wx/stc/stc.h>
 #include <wx/tokenzr.h>
 #include <wx/display.h>
+#include <wx/dcgraph.h>
 
 const wxEventType wxEVT_TIP_BTN_CLICKED_UP = wxNewEventType();
 const wxEventType wxEVT_TIP_BTN_CLICKED_DOWN = wxNewEventType();
@@ -71,21 +72,22 @@ static void CCBoxTipWindow_ShrinkTip(wxString& str)
     while(str.Replace("\n\n", "\n")) {}
 }
 
-CCBoxTipWindow::CCBoxTipWindow(wxWindow* parent, const wxString& tip)
+CCBoxTipWindow::CCBoxTipWindow(wxWindow* parent, bool manipulateText, const wxString& tip)
     : wxPopupWindow(parent)
     , m_tip(tip)
     , m_useLightColours(false)
 {
-    CCBoxTipWindow_ShrinkTip(m_tip);
+    if(manipulateText) { CCBoxTipWindow_ShrinkTip(m_tip); }
     DoInitialize(m_tip, 1, true);
 }
 
-CCBoxTipWindow::CCBoxTipWindow(wxWindow* parent, const wxString& tip, size_t numOfTips, bool simpleTip)
+CCBoxTipWindow::CCBoxTipWindow(wxWindow* parent, bool manipulateText, const wxString& tip, size_t numOfTips,
+                               bool simpleTip)
     : wxPopupWindow(parent)
     , m_tip(tip)
     , m_useLightColours(false)
 {
-    CCBoxTipWindow_ShrinkTip(m_tip);
+    if(manipulateText) { CCBoxTipWindow_ShrinkTip(m_tip); }
     DoInitialize(m_tip, numOfTips, simpleTip);
 }
 
@@ -108,21 +110,15 @@ void CCBoxTipWindow::DoInitialize(const wxString& tip, size_t numOfTips, bool si
     m_rightTipRect = wxRect();
 
     if(!simpleTip && m_numOfTips > 1) m_tip.Prepend(wxT("\n\n")); // Make room for the arrows
-
     Hide();
 
     wxBitmap bmp(1, 1);
-    wxMemoryDC dc(bmp);
-
+    wxMemoryDC memDC(bmp);
+    wxGCDC gcdc(memDC);
     wxSize size;
-    
-    if(editor) {
-        // Use the active editor's font
-        m_codeFont = editor->GetCtrl()->StyleGetFont(0);
-    } else {
-        m_codeFont = DrawingUtils::GetDefaultFixedFont();
-    }
     m_commentFont = DrawingUtils::GetDefaultGuiFont();
+    m_codeFont = DrawingUtils::GetBestFixedFont(editor);
+    gcdc.SetFont(m_commentFont);
 
     wxString codePart, commentPart;
     wxString strippedTip = DoStripMarkups();
@@ -147,17 +143,11 @@ void CCBoxTipWindow::DoInitialize(const wxString& tip, size_t numOfTips, bool si
 
     int commentWidth = 0;
     int codeWidth = 0;
-
-    // Use bold font for measurements
-    // m_codeFont.SetWeight(wxFONTWEIGHT_BOLD);
-    // m_commentFont.SetWeight(wxFONTWEIGHT_BOLD);
-
     if(!simpleTip) {
-        dc.GetMultiLineTextExtent(codePart, &codeWidth, NULL, NULL, &m_codeFont);
-        dc.GetMultiLineTextExtent(commentPart, &commentWidth, NULL, NULL, &m_commentFont);
-
+        gcdc.GetMultiLineTextExtent(codePart, &codeWidth, NULL, NULL, &m_codeFont);
+        gcdc.GetMultiLineTextExtent(commentPart, &commentWidth, NULL, NULL, &m_commentFont);
     } else {
-        dc.GetMultiLineTextExtent(strippedTip, &codeWidth, NULL, NULL, &m_commentFont);
+        gcdc.GetMultiLineTextExtent(strippedTip, &codeWidth, NULL, NULL, &m_commentFont);
     }
 
     m_codeFont.SetWeight(wxFONTWEIGHT_NORMAL);
@@ -170,7 +160,7 @@ void CCBoxTipWindow::DoInitialize(const wxString& tip, size_t numOfTips, bool si
     m_tip.Replace("\r", "");
     while(m_tip.Replace("\n\n", "\n")) {}
 
-    dc.GetTextExtent(wxT("Tp"), NULL, &m_lineHeight, NULL, NULL, &m_codeFont);
+    gcdc.GetTextExtent(wxT("Tp"), NULL, &m_lineHeight, NULL, NULL, &m_codeFont);
     int nLineCount = ::wxStringTokenize(m_tip, wxT("\r\n"), wxTOKEN_RET_EMPTY_ALL).GetCount();
 
     size.y = nLineCount * m_lineHeight;
@@ -180,7 +170,7 @@ void CCBoxTipWindow::DoInitialize(const wxString& tip, size_t numOfTips, bool si
     size_t maxWidth(0);
 
     // Calc the width
-    DoDrawTip(dc, maxWidth);
+    DoDrawTip(gcdc, maxWidth);
     size.x = maxWidth;
     SetSize(size);
 
@@ -204,7 +194,7 @@ void CCBoxTipWindow::PositionRelativeTo(wxWindow* win, wxPoint caretPos, IEditor
     wxRect displaySize = ::clGetDisplaySize();
     int displayIndex = wxDisplay::GetFromPoint(pt);
     if(displayIndex != wxNOT_FOUND) { displaySize = wxDisplay(displayIndex).GetGeometry(); }
-    
+
     if((pt.x + tipSize.x) > (displaySize.GetX() + displaySize.GetWidth())) {
         // Move the tip to the left
         pt = windowPos;
@@ -260,7 +250,8 @@ void CCBoxTipWindow::OnEraseBG(wxEraseEvent& e) { wxUnusedVar(e); }
 void CCBoxTipWindow::OnPaint(wxPaintEvent& e)
 {
     m_links.clear();
-    wxAutoBufferedPaintDC dc(this);
+    wxAutoBufferedPaintDC bdc(this);
+    wxGCDC dc(bdc);
     PrepareDC(dc);
     size_t maxWidth(0);
     DoDrawTip(dc, maxWidth);
@@ -349,14 +340,21 @@ void CCBoxTipWindow::PositionLeftTo(wxWindow* win, IEditor* focusEditor)
 
 void CCBoxTipWindow::DoDrawTip(wxDC& dc, size_t& max_width)
 {
-    clColours colors = DrawingUtils::GetColours();
-    
+    clColours colours = DrawingUtils::GetColours();
     IEditor* editor = clGetManager()->GetActiveEditor();
-    if(editor) { colors.InitFromColour(editor->GetCtrl()->StyleGetBackground(0)); }
-    
-    wxColour penColour = colors.GetBorderColour();
-    wxColour brushColour = colors.GetBgColour();
-    wxColour textColour = colors.GetItemTextColour();
+    if(editor) {
+        wxColour bgColour = editor->GetCtrl()->StyleGetBackground(0);
+        if(DrawingUtils::IsDark(bgColour)) {
+            colours.InitFromColour(bgColour);
+            m_useLightColours = !DrawingUtils::IsDark(bgColour);
+        } else {
+            colours.InitFromColour(wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
+        }
+    }
+
+    wxColour penColour = colours.GetBorderColour();
+    wxColour brushColour = colours.GetBgColour();
+    wxColour textColour = colours.GetItemTextColour();
     wxColour linkColour("rgb(204, 153, 255)");
 
     if(m_useLightColours) {

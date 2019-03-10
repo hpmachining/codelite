@@ -35,6 +35,7 @@
 #include <wx/arrstr.h>
 #include <wx/event.h>
 #include <wx/sharedptr.h>
+#include "LSP/CompletionItem.h"
 
 // Set of flags that can be passed within the 'S{G}etInt' function of clCommandEvent
 enum {
@@ -228,6 +229,7 @@ class WXDLLIMPEXP_CL clCodeCompletionEvent : public clCommandEvent
     wxCodeCompletionBoxEntry::Ptr_t m_entry;
     wxArrayString m_definitions;
     wxCodeCompletionBoxEntry::Vec_t m_entries;
+    LSP::CompletionItem::eTriggerKind m_triggerKind = LSP::CompletionItem::kTriggerUnknown;
 
 public:
     clCodeCompletionEvent(wxEventType commandType = wxEVT_NULL, int winid = 0);
@@ -249,6 +251,9 @@ public:
     const wxCodeCompletionBoxEntry::Vec_t& GetEntries() const { return m_entries; }
     wxCodeCompletionBoxEntry::Vec_t& GetEntries() { return m_entries; }
 
+    const LSP::CompletionItem::eTriggerKind& GetTriggerKind() const { return m_triggerKind; }
+    void SetTriggerKind(const LSP::CompletionItem::eTriggerKind& triggerKind) { this->m_triggerKind = triggerKind; }
+    
     /**
      * @brief return the Editor object
      */
@@ -327,7 +332,7 @@ public:
 
     void SetIsRunning(bool isRunning) { this->m_isRunning = isRunning; }
     bool IsRunning() const { return m_isRunning; }
-    
+
     void SetKind(const wxString& kind) { this->m_kind = kind; }
     const wxString& GetKind() const { return this->m_kind; }
 
@@ -654,6 +659,35 @@ public:
 
 typedef void (wxEvtHandler::*clFindEventFunction)(clFindEvent&);
 #define clFindEventHandler(func) wxEVENT_HANDLER_CAST(clFindEventFunction, func)
+
+//---------------------------------------------------------------
+// Find in files event
+//---------------------------------------------------------------
+class WXDLLIMPEXP_CL clFindInFilesEvent : public clCommandEvent
+{
+    wxString m_paths;
+    wxString m_fileMask;
+    size_t m_options = 0;
+    wxString m_transientPaths;
+
+public:
+    clFindInFilesEvent(wxEventType commandType = wxEVT_NULL, int winid = 0);
+    clFindInFilesEvent(const clFindInFilesEvent& event);
+    clFindInFilesEvent& operator=(const clFindInFilesEvent& src);
+    virtual ~clFindInFilesEvent();
+    virtual wxEvent* Clone() const { return new clFindInFilesEvent(*this); }
+    void SetFileMask(const wxString& fileMask) { this->m_fileMask = fileMask; }
+    void SetOptions(size_t options) { this->m_options = options; }
+    const wxString& GetFileMask() const { return m_fileMask; }
+    size_t GetOptions() const { return m_options; }
+    void SetPaths(const wxString& paths) { this->m_paths = paths; }
+    const wxString& GetPaths() const { return m_paths; }
+    void SetTransientPaths(const wxString& transientPaths) { this->m_transientPaths = transientPaths; }
+    const wxString& GetTransientPaths() const { return m_transientPaths; }
+};
+
+typedef void (wxEvtHandler::*clFindInFilesEventFunction)(clFindInFilesEvent&);
+#define clFindInFilesEventHandler(func) wxEVENT_HANDLER_CAST(clFindInFilesEventFunction, func)
 
 // --------------------------------------------------------------
 // Parsing event

@@ -3,6 +3,7 @@
 #include "NodeJSEvents.h"
 #include "event_notifier.h"
 #include <vector>
+#include "file_logger.h"
 
 DebuggerPaused::DebuggerPaused()
     : NodeMessageBase("Debugger.paused")
@@ -11,22 +12,30 @@ DebuggerPaused::DebuggerPaused()
 
 DebuggerPaused::~DebuggerPaused() {}
 
-void DebuggerPaused::Process(clWebSocketClient& socket, const JSONElement& json)
+void DebuggerPaused::Process(clWebSocketClient& socket, const JSONItem& json)
 {
     m_stopReason = json.namedObject("reason").toString();
-    JSONElement frames = json.namedObject("callFrames");
+    JSONItem frames = json.namedObject("callFrames");
     nSerializableObject::Vec_t V;
     int size = frames.arraySize();
     for(int i = 0; i < size; ++i) {
-        JSONElement frame = frames.arrayItem(i);
+        JSONItem frame = frames.arrayItem(i);
         nSerializableObject::Ptr_t f(new CallFrame());
         f->FromJSON(frame);
         V.push_back(f);
     }
-
+    
+    wxString extraMessage;
+    if(json.hasNamedObject("data")) {
+        JSONItem data = json.namedObject("data");
+        if(data.hasNamedObject("description")) {
+            extraMessage = data.namedObject("description").toString();
+        }
+    }
     // Notify the UI that the debugger paused
     clDebugEvent pauseEvent(wxEVT_NODEJS_DEBUGGER_INTERACT);
     pauseEvent.SetString(m_stopReason);
+    pauseEvent.SetArguments(extraMessage);
     pauseEvent.SetAnswer(true);
     EventNotifier::Get()->ProcessEvent(pauseEvent);
 

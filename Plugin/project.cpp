@@ -45,6 +45,8 @@
 #include <wx/regex.h>
 #include <wx/sstream.h>
 #include <wx/tokenzr.h>
+#include "ICompilerLocator.h"
+#include "asyncprocess.h"
 
 static wxStringMap_t s_backticks;
 
@@ -1239,41 +1241,38 @@ void Project::SetExcludeConfigsForFile(const wxString& filename, const wxStringS
     SaveXmlFile();
 }
 
-wxString Project::GetCompileLineForCXXFile(const wxString& filenamePlaceholder, bool cxxFile) const
+wxString Project::GetCompileLineForCXXFile(const wxStringMap_t& compilersGlobalPaths, BuildConfigPtr buildConf,
+                                           const wxString& filenamePlaceholder, bool cxxFile) const
 {
     // Return a compilation line for a CXX file
-    BuildMatrixPtr matrix = GetWorkspace()->GetBuildMatrix();
-    if(!matrix) { return ""; }
-    wxString workspaceSelConf = matrix->GetSelectedConfigurationName();
-    wxString projectSelConf = matrix->GetProjectSelectedConf(workspaceSelConf, GetName());
-    BuildConfigPtr buildConf = GetWorkspace()->GetProjBuildConf(this->GetName(), projectSelConf);
-    if(!buildConf || buildConf->IsCustomBuild() || !buildConf->IsCompilerRequired()) { return ""; }
+    if(!buildConf) { return ""; }
 
     CompilerPtr compiler = buildConf->GetCompiler();
     if(!compiler) { return ""; }
     // Build the command line
     wxString commandLine;
+    wxString extraFlags;
+#ifdef __WXMSW__
+    if(compiler->GetCompilerFamily() == COMPILER_FAMILY_MINGW) {
+#if _WIN64
+        extraFlags = "-target x86_64-pc-windows-gnu";
+#else
+        extraFlags = "-target i686-pc-windows-gnu";
+#endif
+    }
+#endif
+
+    // Add the compiler global paths if needed
+    if(compilersGlobalPaths.count(compiler->GetName())) {
+        extraFlags << " " << compilersGlobalPaths.find(compiler->GetName())->second;
+    }
 
     wxString compilerExe = compiler->GetTool(cxxFile ? "CXX" : "CC");
-    commandLine << compilerExe << " -c " << filenamePlaceholder << " -o " << filenamePlaceholder << ".o ";
+    commandLine << "clang "
+                << " -c " << filenamePlaceholder << " -o " << filenamePlaceholder << ".o " << extraFlags;
 
     // Apply the environment
     EnvSetter es(NULL, NULL, GetName(), buildConf->GetName());
-
-    // Clear the backticks cache
-    //    s_backticks.clear();
-
-    // Get the compile options
-    wxString projectCompileOptions = cxxFile ? buildConf->GetCompileOptions() : buildConf->GetCCompileOptions();
-    wxArrayString projectCompileOptionsArr = ::wxStringTokenize(projectCompileOptions, ";", wxTOKEN_STRTOK);
-    for(size_t i = 0; i < projectCompileOptionsArr.GetCount(); ++i) {
-        wxString cmpOption(projectCompileOptionsArr.Item(i));
-        cmpOption.Trim().Trim(false);
-
-        // expand backticks, if the option is not a backtick the value remains
-        // unchanged
-        commandLine << " " << DoExpandBacktick(cmpOption) << " ";
-    }
 
     // Add the macros
     wxArrayString prepArr;
@@ -1294,8 +1293,22 @@ wxString Project::GetCompileLineForCXXFile(const wxString& filenamePlaceholder, 
 
         commandLine << "-I" << incl_path << " ";
     }
+    
+    // Get the compile options
+    wxString projectCompileOptions = cxxFile ? buildConf->GetCompileOptions() : buildConf->GetCCompileOptions();
+    wxArrayString projectCompileOptionsArr = ::wxStringTokenize(projectCompileOptions, ";", wxTOKEN_STRTOK);
+    for(size_t i = 0; i < projectCompileOptionsArr.GetCount(); ++i) {
+        wxString cmpOption(projectCompileOptionsArr.Item(i));
+        cmpOption.Trim().Trim(false);
 
+        // expand backticks, if the option is not a backtick the value remains
+        // unchanged
+        commandLine << " " << DoExpandBacktick(cmpOption) << " ";
+    }
+    
     commandLine.Trim().Trim(false);
+    commandLine.Replace("\n", " ");
+    commandLine.Replace("\r", " ");
     return commandLine;
 }
 
@@ -1314,7 +1327,14 @@ wxString Project::DoExpandBacktick(const wxString& backtick) const
         if(s_backticks.find(cmpOption) == s_backticks.end()) {
 
             // Expand the backticks into their value
-            wxString expandedValue = ::wxShellExec(cmpOption, GetName());
+            wxString expandedValue;
+            {
+                EnvSetter es(NULL, NULL, GetName(), wxEmptyString);
+                cmpOption = MacroManager::Instance()->Expand(cmpOption, nullptr, GetName(), wxEmptyString);
+                IProcess::Ptr_t p(::CreateSyncProcess(cmpOption, IProcessCreateDefault, GetFileName().GetPath()));
+                if(p) { p->WaitForTerminate(expandedValue); }
+            }
+
             s_backticks[cmpOption] = expandedValue;
             cmpOption = expandedValue;
 
@@ -1326,10 +1346,11 @@ wxString Project::DoExpandBacktick(const wxString& backtick) const
     return cmpOption;
 }
 
-void Project::CreateCompileCommandsJSON(JSONElement& compile_commands)
+void Project::CreateCompileCommandsJSON(JSONItem& compile_commands, const wxStringMap_t& compilersGlobalPaths)
 {
-    wxString cFilePattern = GetCompileLineForCXXFile("$FileName", false);
-    wxString cxxFilePattern = GetCompileLineForCXXFile("$FileName", true);
+    BuildConfigPtr buildConf = GetBuildConfiguration();
+    wxString cFilePattern = GetCompileLineForCXXFile(compilersGlobalPaths, buildConf, "$FileName", false);
+    wxString cxxFilePattern = GetCompileLineForCXXFile(compilersGlobalPaths, buildConf, "$FileName", true);
     wxString workingDirectory = m_fileName.GetPath();
     std::for_each(m_filesTable.begin(), m_filesTable.end(), [&](const FilesMap_t::value_type& vt) {
         const wxString& fullpath = vt.second->GetFilename();
@@ -1346,7 +1367,7 @@ void Project::CreateCompileCommandsJSON(JSONElement& compile_commands)
             if(file_name.Contains(" ")) { file_name.Prepend("\"").Append("\""); }
             compilePattern.Replace("$FileName", file_name);
 
-            JSONElement json = JSONElement::createObject();
+            JSONItem json = JSONItem::createObject();
             json.addProperty("file", fullpath);
             json.addProperty("directory", workingDirectory);
             json.addProperty("command", compilePattern);

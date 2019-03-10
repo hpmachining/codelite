@@ -35,6 +35,7 @@
 #include "pluginmanager.h"
 #include "quickfindbar.h"
 #include <wx/xrc/xmlres.h>
+#include "clThemeUpdater.h"
 
 BEGIN_EVENT_TABLE(OutputTabWindow, wxPanel)
 EVT_MENU(XRCID("scroll_on_output"), OutputTabWindow::OnOutputScrolls)
@@ -63,6 +64,7 @@ OutputTabWindow::OutputTabWindow(wxWindow* parent, wxWindowID id, const wxString
     , m_autoAppearErrors(false)
     , m_errorsFirstLine(false)
 {
+    clThemeUpdater::Get().RegisterWindow(this);
     m_styler.Reset(new clFindResultsStyler());
     CreateGUIControls();
     wxTheApp->Connect(wxID_COPY, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(OutputTabWindow::OnEdit), NULL,
@@ -78,6 +80,7 @@ OutputTabWindow::OutputTabWindow(wxWindow* parent, wxWindowID id, const wxString
 
 OutputTabWindow::~OutputTabWindow()
 {
+    clThemeUpdater::Get().UnRegisterWindow(this);
     m_styler.Reset(NULL);
     wxDELETE(m_themeHelper);
     EventNotifier::Get()->Disconnect(wxEVT_CL_THEME_CHANGED, wxCommandEventHandler(OutputTabWindow::OnThemeChanged),
@@ -172,12 +175,8 @@ void OutputTabWindow::CreateGUIControls()
 
     m_vSizer = new wxBoxSizer(wxVERTICAL);
 
-// Create the default scintilla control
-#ifdef __WXGTK__
-    m_sci = new wxStyledTextCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxRAISED_BORDER);
-#else
+    // Create the default scintilla control
     m_sci = new wxStyledTextCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
-#endif
 
     // We dont really want to collect undo in the output tabs...
     m_sci->SetUndoCollection(false);

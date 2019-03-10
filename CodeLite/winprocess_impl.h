@@ -31,13 +31,16 @@
 #include "codelite_exports.h"
 #include <Windows.h>
 #include <wx/string.h>
+#include <thread>
 
 class ProcessReaderThread;
+class WinWriterThread;
 
 class WXDLLIMPEXP_CL WinProcessImpl : public IProcess
 {
     ProcessReaderThread* m_thr;
     char m_buffer[65537];
+    WinWriterThread* m_writerThread = nullptr;
 
 protected:
     void StartReaderThread();
@@ -54,15 +57,15 @@ public:
                              IProcessCallback* cb = NULL);
 
     /**
-     * @brief read data from stdout, if no data is available, return
-     * if timeout occurred, return with true.
+     * @brief read data from stdout and error
      * @param buff check the buffer when true is returned
      * @return return true on success or timeout, flase otherwise, incase of false the reader thread will terminate
      */
-    virtual bool Read(wxString& buff);
+    virtual bool Read(wxString& buff, wxString& buffErr);
 
     // Write to the process stdin
     virtual bool Write(const wxString& buff);
+    virtual bool Write(const std::string& buff);
 
     virtual bool WriteToConsole(const wxString& buff);
 

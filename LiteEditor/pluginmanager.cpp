@@ -32,7 +32,6 @@
 #include "clToolBarButtonBase.h"
 #include "cl_config.h"
 #include "cl_standard_paths.h"
-#include "clang_code_completion.h"
 #include "ctags_manager.h"
 #include "debugger.h"
 #include "detachedpanesinfo.h"
@@ -61,6 +60,7 @@
 #include <wx/log.h>
 #include <wx/tokenzr.h>
 #include <wx/toolbook.h>
+#include "clInfoBar.h"
 
 PluginManager* PluginManager::Get()
 {
@@ -262,13 +262,13 @@ void PluginManager::Load()
 
             // Load the toolbar
             plugin->CreateToolBar(GetToolBar());
-            
+
             // Keep the dynamic load library
             m_dl.push_back(dl);
         }
         clMainFrame::Get()->GetDockingManager().Update();
         GetToolBar()->Realize();
-        
+
         // Let the plugins plug their menu in the 'Plugins' menu at the menu bar
         // the create menu will be placed as a sub menu of the 'Plugin' menu
         wxMenu* pluginsMenu = NULL;
@@ -362,15 +362,9 @@ TreeItemInfo PluginManager::GetSelectedTreeItemInfo(TreeType type)
     }
 }
 
-clTreeCtrl* PluginManager::GetWorkspaceTree()
-{
-    return clMainFrame::Get()->GetWorkspaceTab()->GetFileView();
-}
+clTreeCtrl* PluginManager::GetWorkspaceTree() { return clMainFrame::Get()->GetWorkspaceTab()->GetFileView(); }
 
-clTreeCtrl* PluginManager::GetFileExplorerTree()
-{
-    return clMainFrame::Get()->GetFileExplorer()->GetTree();
-}
+clTreeCtrl* PluginManager::GetFileExplorerTree() { return clMainFrame::Get()->GetFileExplorer()->GetTree(); }
 
 Notebook* PluginManager::GetOutputPaneNotebook() { return clMainFrame::Get()->GetOutputPane()->GetNotebook(); }
 
@@ -687,26 +681,7 @@ IEditor* PluginManager::FindEditor(const wxString& filename) const
     return clMainFrame::Get()->GetMainBook()->FindEditor(filename);
 }
 
-void PluginManager::EnableClangCodeCompletion(bool b)
-{
-#if HAS_LIBCLANG
-    ClangCodeCompletion::Instance()->ClearCache();
-    TagsOptionsData& options = clMainFrame::Get()->GetTagsOptions();
-    size_t clang_flags = options.GetClangOptions();
-
-    if(b) {
-        clang_flags |= CC_CLANG_ENABLED;
-    } else {
-        clang_flags &= ~CC_CLANG_ENABLED;
-    }
-
-    options.SetClangOptions(clang_flags);
-    TagsManagerST::Get()->SetCtagsOptions(options);
-
-#else
-    wxUnusedVar(b);
-#endif
-}
+void PluginManager::EnableClangCodeCompletion(bool b) { wxUnusedVar(b); }
 
 size_t PluginManager::GetPageCount() const { return clMainFrame::Get()->GetMainBook()->GetPageCount(); }
 
@@ -887,3 +862,9 @@ bool PluginManager::CloseEditor(IEditor* editor, bool prompt)
 clEditorBar* PluginManager::GetNavigationBar() { return clMainFrame::Get()->GetMainBook()->GetEditorBar(); }
 
 clToolBar* PluginManager::GetToolBar() { return clMainFrame::Get()->GetMainToolBar(); }
+
+void PluginManager::DisplayMessage(const wxString& message, int flags,
+                                   const std::vector<std::pair<wxWindowID, wxString> >& buttons)
+{
+    return clMainFrame::Get()->GetMessageBar()->DisplayMessage(message, flags, buttons);
+}

@@ -47,8 +47,8 @@ SyntaxHighlightBaseDlg::SyntaxHighlightBaseDlg(wxWindow* parent, wxWindowID id, 
 
     boxSizer173->Add(m_toolbar, 0, wxEXPAND, WXC_FROM_DIP(5));
 
-    m_notebook = new Notebook(m_panel171, wxID_ANY, wxDefaultPosition, wxDLG_UNIT(m_panel171, wxSize(500, 300)),
-                              kNotebook_UnderlineActiveTab);
+    m_notebook =
+        new wxNotebook(m_panel171, wxID_ANY, wxDefaultPosition, wxDLG_UNIT(m_panel171, wxSize(-1, -1)), wxBK_DEFAULT);
     m_notebook->SetName(wxT("m_notebook"));
 
     boxSizer173->Add(m_notebook, 1, wxALL | wxEXPAND, WXC_FROM_DIP(5));
@@ -61,12 +61,44 @@ SyntaxHighlightBaseDlg::SyntaxHighlightBaseDlg(wxWindow* parent, wxWindowID id, 
     wxBoxSizer* boxSizer82 = new wxBoxSizer(wxVERTICAL);
     m_panelGlobalColours->SetSizer(boxSizer82);
 
+    wxStaticBoxSizer* staticBoxSizer179 =
+        new wxStaticBoxSizer(new wxStaticBox(m_panelGlobalColours, wxID_ANY, _("IDE Theme")), wxVERTICAL);
+
+    boxSizer82->Add(staticBoxSizer179, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+
+    wxFlexGridSizer* flexGridSizer181 = new wxFlexGridSizer(0, 2, 0, 0);
+    flexGridSizer181->SetFlexibleDirection(wxBOTH);
+    flexGridSizer181->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
+    flexGridSizer181->AddGrowableCol(1);
+
+    staticBoxSizer179->Add(flexGridSizer181, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+
+    m_cbUseCustomBaseColour = new wxCheckBox(m_panelGlobalColours, wxID_ANY, _("Use custom base colour:"),
+                                             wxDefaultPosition, wxDLG_UNIT(m_panelGlobalColours, wxSize(-1, -1)), 0);
+    m_cbUseCustomBaseColour->SetValue(false);
+
+    flexGridSizer181->Add(m_cbUseCustomBaseColour, 0, wxALL | wxALIGN_CENTER_VERTICAL, WXC_FROM_DIP(5));
+
+    m_colourPickerBaseColour =
+        new wxColourPickerCtrl(m_panelGlobalColours, wxID_ANY, *wxBLACK, wxDefaultPosition,
+                               wxDLG_UNIT(m_panelGlobalColours, wxSize(-1, -1)), wxCLRP_DEFAULT_STYLE);
+    m_colourPickerBaseColour->SetToolTip(
+        _("By default, CodeLite uses the current desktop theme to build the colour for the various\ncontrols. You can "
+          "override this by choosing a different colour here"));
+
+    flexGridSizer181->Add(m_colourPickerBaseColour, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+
+    wxStaticBoxSizer* staticBoxSizer182 =
+        new wxStaticBoxSizer(new wxStaticBox(m_panelGlobalColours, wxID_ANY, _("Syntax Highlight")), wxVERTICAL);
+
+    boxSizer82->Add(staticBoxSizer182, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+
     wxFlexGridSizer* fgSizer4 = new wxFlexGridSizer(0, 2, 0, 0);
     fgSizer4->SetFlexibleDirection(wxBOTH);
     fgSizer4->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
     fgSizer4->AddGrowableCol(1);
 
-    boxSizer82->Add(fgSizer4, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+    staticBoxSizer182->Add(fgSizer4, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
 
     m_staticText159 = new wxStaticText(m_panelGlobalColours, wxID_ANY, _("Global font:"), wxDefaultPosition,
                                        wxDLG_UNIT(m_panelGlobalColours, wxSize(-1, -1)), 0);
@@ -92,21 +124,6 @@ SyntaxHighlightBaseDlg::SyntaxHighlightBaseDlg(wxWindow* parent, wxWindowID id, 
           "CodeLite will use the next available theme from\nthe same family"));
 
     fgSizer4->Add(m_choiceGlobalTheme, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
-
-    m_cbUseCustomBaseColour = new wxCheckBox(m_panelGlobalColours, wxID_ANY, _("Use custom base colour:"),
-                                             wxDefaultPosition, wxDLG_UNIT(m_panelGlobalColours, wxSize(-1, -1)), 0);
-    m_cbUseCustomBaseColour->SetValue(false);
-
-    fgSizer4->Add(m_cbUseCustomBaseColour, 0, wxALL | wxALIGN_CENTER_VERTICAL, WXC_FROM_DIP(5));
-
-    m_colourPickerBaseColour =
-        new wxColourPickerCtrl(m_panelGlobalColours, wxID_ANY, *wxBLACK, wxDefaultPosition,
-                               wxDLG_UNIT(m_panelGlobalColours, wxSize(-1, -1)), wxCLRP_DEFAULT_STYLE);
-    m_colourPickerBaseColour->SetToolTip(
-        _("By default, CodeLite uses the current desktop theme to build the colour for the various\ncontrols. You can "
-          "override this by choosing a different colour here"));
-
-    fgSizer4->Add(m_colourPickerBaseColour, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
 
     m_stcPreview = new wxStyledTextCtrl(m_panelGlobalColours, wxID_ANY, wxDefaultPosition,
                                         wxDLG_UNIT(m_panelGlobalColours, wxSize(-1, -1)), 0);
@@ -170,8 +187,8 @@ SyntaxHighlightBaseDlg::SyntaxHighlightBaseDlg(wxWindow* parent, wxWindowID id, 
     wxBoxSizer* bSizer3 = new wxBoxSizer(wxVERTICAL);
     m_panel25->SetSizer(bSizer3);
 
-    m_notebook2 = new Notebook(m_panel25, wxID_ANY, wxDefaultPosition, wxDLG_UNIT(m_panel25, wxSize(-1, -1)),
-                               kNotebook_UnderlineActiveTab);
+    m_notebook2 =
+        new wxNotebook(m_panel25, wxID_ANY, wxDefaultPosition, wxDLG_UNIT(m_panel25, wxSize(-1, -1)), wxBK_DEFAULT);
     m_notebook2->SetName(wxT("m_notebook2"));
 
     bSizer3->Add(m_notebook2, 1, wxEXPAND, WXC_FROM_DIP(5));
@@ -447,10 +464,6 @@ SyntaxHighlightBaseDlg::SyntaxHighlightBaseDlg(wxWindow* parent, wxWindowID id, 
         CentreOnScreen(wxBOTH);
     }
     // Connect events
-    m_fontPickerGlobal->Connect(wxEVT_COMMAND_FONTPICKER_CHANGED,
-                                wxFontPickerEventHandler(SyntaxHighlightBaseDlg::OnGlobalFontSelected), NULL, this);
-    m_choiceGlobalTheme->Connect(wxEVT_COMMAND_CHOICE_SELECTED,
-                                 wxCommandEventHandler(SyntaxHighlightBaseDlg::OnGlobalThemeSelected), NULL, this);
     m_cbUseCustomBaseColour->Connect(wxEVT_COMMAND_CHECKBOX_CLICKED,
                                      wxCommandEventHandler(SyntaxHighlightBaseDlg::OnUseCustomBaseColour), NULL, this);
     m_colourPickerBaseColour->Connect(wxEVT_UPDATE_UI,
@@ -458,6 +471,10 @@ SyntaxHighlightBaseDlg::SyntaxHighlightBaseDlg(wxWindow* parent, wxWindowID id, 
     m_colourPickerBaseColour->Connect(wxEVT_COMMAND_COLOURPICKER_CHANGED,
                                       wxColourPickerEventHandler(SyntaxHighlightBaseDlg::OnCustomBaseColourPIcked),
                                       NULL, this);
+    m_fontPickerGlobal->Connect(wxEVT_COMMAND_FONTPICKER_CHANGED,
+                                wxFontPickerEventHandler(SyntaxHighlightBaseDlg::OnGlobalFontSelected), NULL, this);
+    m_choiceGlobalTheme->Connect(wxEVT_COMMAND_CHOICE_SELECTED,
+                                 wxCommandEventHandler(SyntaxHighlightBaseDlg::OnGlobalThemeSelected), NULL, this);
     m_listBox->Connect(wxEVT_COMMAND_LISTBOX_SELECTED, wxCommandEventHandler(SyntaxHighlightBaseDlg::OnLexerSelected),
                        NULL, this);
     m_choiceLexerThemes->Connect(wxEVT_COMMAND_CHOICE_SELECTED,
@@ -516,10 +533,6 @@ SyntaxHighlightBaseDlg::SyntaxHighlightBaseDlg(wxWindow* parent, wxWindowID id, 
 
 SyntaxHighlightBaseDlg::~SyntaxHighlightBaseDlg()
 {
-    m_fontPickerGlobal->Disconnect(wxEVT_COMMAND_FONTPICKER_CHANGED,
-                                   wxFontPickerEventHandler(SyntaxHighlightBaseDlg::OnGlobalFontSelected), NULL, this);
-    m_choiceGlobalTheme->Disconnect(wxEVT_COMMAND_CHOICE_SELECTED,
-                                    wxCommandEventHandler(SyntaxHighlightBaseDlg::OnGlobalThemeSelected), NULL, this);
     m_cbUseCustomBaseColour->Disconnect(wxEVT_COMMAND_CHECKBOX_CLICKED,
                                         wxCommandEventHandler(SyntaxHighlightBaseDlg::OnUseCustomBaseColour), NULL,
                                         this);
@@ -528,6 +541,10 @@ SyntaxHighlightBaseDlg::~SyntaxHighlightBaseDlg()
     m_colourPickerBaseColour->Disconnect(wxEVT_COMMAND_COLOURPICKER_CHANGED,
                                          wxColourPickerEventHandler(SyntaxHighlightBaseDlg::OnCustomBaseColourPIcked),
                                          NULL, this);
+    m_fontPickerGlobal->Disconnect(wxEVT_COMMAND_FONTPICKER_CHANGED,
+                                   wxFontPickerEventHandler(SyntaxHighlightBaseDlg::OnGlobalFontSelected), NULL, this);
+    m_choiceGlobalTheme->Disconnect(wxEVT_COMMAND_CHOICE_SELECTED,
+                                    wxCommandEventHandler(SyntaxHighlightBaseDlg::OnGlobalThemeSelected), NULL, this);
     m_listBox->Disconnect(wxEVT_COMMAND_LISTBOX_SELECTED,
                           wxCommandEventHandler(SyntaxHighlightBaseDlg::OnLexerSelected), NULL, this);
     m_choiceLexerThemes->Disconnect(wxEVT_COMMAND_CHOICE_SELECTED,

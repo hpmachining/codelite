@@ -44,6 +44,44 @@
  }]]]>
     </Plugin>
   </Plugins>
+  <VirtualDirectory Name="LSP">
+    <File Name="LSP/ResponseError.cpp"/>
+    <File Name="LSP/ResponseError.h"/>
+    <File Name="LSP/CompletionItem.cpp"/>
+    <File Name="LSP/CompletionItem.h"/>
+    <File Name="LSP/CompletionRequest.cpp"/>
+    <File Name="LSP/CompletionRequest.h"/>
+    <File Name="LSP/InitializeRequest.cpp"/>
+    <File Name="LSP/InitializeRequest.h"/>
+    <File Name="LSP/LSPEvent.cpp"/>
+    <File Name="LSP/LSPEvent.h"/>
+    <File Name="LSP/ResponseMessage.h"/>
+    <File Name="LSP/ResponseMessage.cpp"/>
+    <File Name="LSP/RequestMessage.h"/>
+    <File Name="LSP/RequestMessage.cpp"/>
+    <File Name="LSP/Message.h"/>
+    <File Name="LSP/Message.cpp"/>
+    <File Name="LSP/JSONObject.h"/>
+    <File Name="LSP/JSONObject.cpp"/>
+    <File Name="LSP/json_rpc_results.h"/>
+    <File Name="LSP/json_rpc_results.cpp"/>
+    <File Name="LSP/json_rpc_params.h"/>
+    <File Name="LSP/json_rpc_params.cpp"/>
+    <File Name="LSP/GotoDefinitionRequest.h"/>
+    <File Name="LSP/GotoDefinitionRequest.cpp"/>
+    <File Name="LSP/DidSaveTextDocumentRequest.h"/>
+    <File Name="LSP/DidSaveTextDocumentRequest.cpp"/>
+    <File Name="LSP/DidOpenTextDocumentRequest.h"/>
+    <File Name="LSP/DidOpenTextDocumentRequest.cpp"/>
+    <File Name="LSP/DidCloseTextDocumentRequest.h"/>
+    <File Name="LSP/DidCloseTextDocumentRequest.cpp"/>
+    <File Name="LSP/DidChangeTextDocumentRequest.h"/>
+    <File Name="LSP/DidChangeTextDocumentRequest.cpp"/>
+    <File Name="LSP/clJSONRPC.h"/>
+    <File Name="LSP/clJSONRPC.cpp"/>
+    <File Name="LSP/basic_types.h"/>
+    <File Name="LSP/basic_types.cpp"/>
+  </VirtualDirectory>
   <VirtualDirectory Name="Console">
     <File Name="clConsoleXfce4Terminal.cpp"/>
     <File Name="clConsoleXfce4Terminal.h"/>
@@ -323,8 +361,8 @@
   </VirtualDirectory>
   <Dependencies Name="WinRelease_29"/>
   <VirtualDirectory Name="configuration">
-    <File Name="json_node.cpp"/>
-    <File Name="json_node.h"/>
+    <File Name="JSON.cpp"/>
+    <File Name="JSON.h"/>
     <File Name="cJSON.cpp"/>
     <File Name="cJSON.h"/>
     <File Name="cl_config.cpp"/>

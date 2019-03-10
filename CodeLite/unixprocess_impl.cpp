@@ -25,6 +25,11 @@
 
 #include "file_logger.h"
 #include "unixprocess_impl.h"
+#include <cstring>
+#include "file_logger.h"
+#include "fileutils.h"
+#include <thread>
+#include "SocketAPI/clSocketBase.h"
 
 #if defined(__WXMAC__) || defined(__WXGTK__)
 
@@ -301,7 +306,7 @@ void UnixProcessImpl::Cleanup()
 {
     close(GetReadHandle());
     close(GetWriteHandle());
-
+    if(GetStderrHandle() != wxNOT_FOUND) { close(GetStderrHandle()); }
     if(m_thr) {
         // Stop the reader thread
         m_thr->Stop();
@@ -319,31 +324,14 @@ void UnixProcessImpl::Cleanup()
 
 bool UnixProcessImpl::IsAlive() { return kill(m_pid, 0) == 0; }
 
-bool UnixProcessImpl::Read(wxString& buff)
+bool UnixProcessImpl::ReadFromFd(int fd, fd_set& rset, wxString& output)
 {
-    fd_set rs;
-    timeval timeout;
-
-    memset(&rs, 0, sizeof(rs));
-    FD_SET(GetReadHandle(), &rs);
-    timeout.tv_sec = 0;      // 0 seconds
-    timeout.tv_usec = 50000; // 50 ms
-
-    int errCode(0);
-    errno = 0;
-
-    buff.Clear();
-    int rc = select(GetReadHandle() + 1, &rs, NULL, NULL, &timeout);
-    errCode = errno;
-    if(rc == 0) {
-        // timeout
-        return true;
-
-    } else if(rc > 0) {
+    if(fd == wxNOT_FOUND) { return false; }
+    if(FD_ISSET(fd, &rset)) {
         // there is something to read
         char buffer[BUFF_SIZE + 1]; // our read buffer
         memset(buffer, 0, sizeof(buffer));
-        int bytesRead = read(GetReadHandle(), buffer, sizeof(buffer));
+        int bytesRead = read(fd, buffer, sizeof(buffer));
         if(bytesRead > 0) {
             buffer[BUFF_SIZE] = 0; // always place a terminator
 
@@ -354,10 +342,41 @@ bool UnixProcessImpl::Read(wxString& buff)
             wxString convBuff = wxString(buffer, wxConvUTF8);
             if(convBuff.IsEmpty()) { convBuff = wxString::From8BitData(buffer); }
 
-            buff = convBuff;
+            output = convBuff;
             return true;
         }
-        return false;
+    }
+    return false;
+}
+
+bool UnixProcessImpl::Read(wxString& buff, wxString& buffErr)
+{
+    fd_set rs;
+    timeval timeout;
+
+    memset(&rs, 0, sizeof(rs));
+    FD_SET(GetReadHandle(), &rs);
+    if(m_stderrHandle != wxNOT_FOUND) { FD_SET(m_stderrHandle, &rs); }
+
+    timeout.tv_sec = 0;      // 0 seconds
+    timeout.tv_usec = 50000; // 50 ms
+
+    int errCode(0);
+    errno = 0;
+
+    buff.Clear();
+    int maxFd = wxMax(GetStderrHandle(), GetReadHandle());
+    int rc = select(maxFd + 1, &rs, NULL, NULL, &timeout);
+    errCode = errno;
+    if(rc == 0) {
+        // timeout
+        return true;
+
+    } else if(rc > 0) {
+        // We differentiate between stdout and stderr?
+        bool stderrRead = ReadFromFd(GetStderrHandle(), rs, buffErr);
+        bool stdoutRead = ReadFromFd(GetReadHandle(), rs, buff);
+        return stderrRead || stdoutRead;
 
     } else {
 
@@ -371,10 +390,41 @@ bool UnixProcessImpl::Read(wxString& buff)
 
 bool UnixProcessImpl::Write(const wxString& buff)
 {
-    wxString tmpbuf = buff;
-    tmpbuf << wxT("\n");
-    int bytes = write(GetWriteHandle(), tmpbuf.mb_str(wxConvUTF8).data(), tmpbuf.Length());
-    return bytes == (int)tmpbuf.length();
+    // Sanity
+    std::string cstr = FileUtils::ToStdString(buff);
+    return Write(cstr);
+    // if(!IsRedirect()) { return false; }
+    // m_writerThread->Write(buff + "\n");
+    // return true;
+}
+
+bool UnixProcessImpl::Write(const std::string& buff)
+{
+    // Sanity
+    if(!IsRedirect()) { return false; }
+    std::string tmp = buff;
+    tmp += "\n";
+
+    clSocketBase c(GetWriteHandle());
+    c.MakeSocketBlocking(false);
+
+    while(!tmp.empty()) {
+        errno = 0;
+        int bytes = ::write(GetWriteHandle(), tmp.c_str(), (tmp.length() > 1024 ? 1024 : tmp.length()));
+        int errCode = errno;
+        if(bytes < 0) {
+            if(((errCode == EWOULDBLOCK) || (errCode == EAGAIN))) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            } else {
+                clWARNING() << "Write error:" << strerror(errCode);
+                return false;
+            }
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            tmp.erase(0, bytes);
+        }
+    }
+    return true;
 }
 
 IProcess* UnixProcessImpl::Execute(wxEvtHandler* parent, const wxString& cmd, size_t flags,
@@ -404,10 +454,38 @@ IProcess* UnixProcessImpl::Execute(wxEvtHandler* parent, const wxString& cmd, si
     int master, slave;
     openpty(&master, &slave, NULL, NULL, NULL);
 
+    // Create a one-way communication channel (pipe).
+    // If successful, two file descriptors are stored in stderrPipes;
+    // bytes written on stderrPipes[1] can be read from stderrPipes[0].
+    // Returns 0 if successful, -1 if not.
+    int stderrPipes[2] = { 0, 0 };
+    if(flags & IProcessStderrEvent) {
+        errno = 0;
+        if(pipe(stderrPipes) < 0) {
+            clERROR() << "Failed to create pipe for stderr redirecting." << strerror(errno);
+            flags &= ~IProcessStderrEvent;
+        }
+    }
+
     int rc = fork();
     if(rc == 0) {
+        //===-------------------------------------------------------
+        // Child process
+        //===-------------------------------------------------------
+
+        // Set 'slave' as STD{IN|OUT|ERR} and close slave FD
         login_tty(slave);
         close(master); // close the un-needed master end
+
+        // Incase the user wants to get separate events for STDERR, dup2 STDERR to the PIPE write end
+        // we opened earlier
+        if(flags & IProcessStderrEvent) {
+            // Dup stderrPipes[1] into stderr
+            close(STDERR_FILENO);
+            dup2(stderrPipes[1], STDERR_FILENO);
+            close(stderrPipes[0]); // close the read end
+        }
+        close(slave);
 
         // at this point, slave is used as stdin/stdout/stderr
         // Child process
@@ -429,8 +507,9 @@ IProcess* UnixProcessImpl::Execute(wxEvtHandler* parent, const wxString& cmd, si
         return NULL;
 
     } else {
-
+        //===-------------------------------------------------------
         // Parent
+        //===-------------------------------------------------------
         close(slave);
         freeargv(argv);
         argc = 0;
@@ -438,6 +517,7 @@ IProcess* UnixProcessImpl::Execute(wxEvtHandler* parent, const wxString& cmd, si
         // disable ECHO
         struct termios termio;
         tcgetattr(master, &termio);
+        cfmakeraw(&termio);
         termio.c_lflag = ICANON;
         termio.c_oflag = ONOCR | ONLRET;
         tcsetattr(master, TCSANOW, &termio);
@@ -447,6 +527,12 @@ IProcess* UnixProcessImpl::Execute(wxEvtHandler* parent, const wxString& cmd, si
 
         UnixProcessImpl* proc = new UnixProcessImpl(parent);
         proc->m_callback = cb;
+        if(flags & IProcessStderrEvent) {
+            close(stderrPipes[1]); // close the write end
+            // set the stderr handle
+            proc->SetStderrHandle(stderrPipes[0]);
+        }
+
         proc->SetReadHandle(master);
         proc->SetWriteHandler(master);
         proc->SetPid(rc);

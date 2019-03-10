@@ -46,6 +46,8 @@
 #include <wx/textctrl.h>
 #include <wx/wupdlock.h>
 #include <wx/xrc/xmlres.h>
+#include "clSystemSettings.h"
+#include "clThemeUpdater.h"
 
 DEFINE_EVENT_TYPE(QUICKFIND_COMMAND_EVENT)
 
@@ -86,9 +88,11 @@ QuickFindBar::QuickFindBar(wxWindow* parent, wxWindowID id)
     , m_highlightMatches(false)
     , m_replaceInSelection(false)
 {
+    //SetBackgroundStyle(wxBG_STYLE_PAINT);
     // Add the 'close' button
     BitmapLoader* bmps = clGetManager()->GetStdIcons();
-
+    clThemeUpdater::Get().RegisterWindow(this);
+    
     // Handle Edit events
     m_findEventsHandler.Reset(new clEditEventsHandler(m_textCtrlFind));
     m_replaceEventsHandler.Reset(new clEditEventsHandler(m_textCtrlReplace));
@@ -105,7 +109,7 @@ QuickFindBar::QuickFindBar(wxWindow* parent, wxWindowID id)
                        wxITEM_CHECK);
     m_toolbar->AddTool(XRCID("whole-word"), _("Whole word"), bmps->LoadBitmap("whole-word"), "", wxITEM_CHECK);
     m_toolbar->AddTool(XRCID("use-regex"), _("Regex"), bmps->LoadBitmap("regular-expression"), "", wxITEM_CHECK);
-    m_toolbar->AddTool(XRCID("highlight-matches"), _("Regex"), bmps->LoadBitmap("marker"), "", wxITEM_CHECK);
+    m_toolbar->AddTool(XRCID("highlight-matches"), _("Highlight matches"), bmps->LoadBitmap("marker"), "", wxITEM_CHECK);
     m_toolbar->AddTool(XRCID("replace-in-selection"), _("Replace In Selection"), bmps->LoadBitmap("text_selection"), "",
                        wxITEM_CHECK);
     m_toolbar->Realize();
@@ -172,6 +176,8 @@ QuickFindBar::QuickFindBar(wxWindow* parent, wxWindowID id)
 
     // Make sure that the 'Replace' field is selected when we hit TAB while in the 'Find' field
     m_textCtrlReplace->MoveAfterInTabOrder(m_textCtrlFind);
+    //Bind(wxEVT_PAINT, &QuickFindBar::OnPaint, this);
+    Bind(wxEVT_ERASE_BACKGROUND, [](wxEraseEvent& e) { wxUnusedVar(e); });
     GetSizer()->Fit(this);
     Layout();
 }
@@ -180,7 +186,9 @@ QuickFindBar::~QuickFindBar()
 {
     // m_findEventsHandler.Reset(nullptr);
     // m_replaceEventsHandler.Reset(nullptr);
-
+    //Unbind(wxEVT_PAINT, &QuickFindBar::OnPaint, this);
+    clThemeUpdater::Get().RegisterWindow(this);
+    
     // Remember the buttons clicked
     clConfig::Get().Write("FindBar/SearchFlags", (int)DoGetSearchFlags());
     clConfig::Get().Write("FindBar/HighlightOccurences", m_highlightMatches);
@@ -848,9 +856,20 @@ void QuickFindBar::DoReplaceAll(bool selectionOnly)
         m_sci->BeginUndoAction();
         m_sci->SetSelection(0, 0);
         m_sci->SetCurrentPos(0); // Start the search from the start
+        size_t replaced(0);
         while(DoSearch(DoGetSearchFlags() | kDisableDisplayErrorMessages | kBreakWhenWrapSearch | kSearchForward)) {
             DoReplace();
+            ++replaced;
         }
+        
+        wxString message;
+        if (replaced) {
+            message << _("Found and replaced ") << replaced << _(" matches");
+        } else {
+            message << _("No matches found");
+        }
+        clGetManager()->SetStatusMessage(message, 5);
+        
         m_sci->EndUndoAction();
         m_sci->ClearSelections();
     } else {
@@ -1169,4 +1188,12 @@ bool QuickFindBar::Search(wxStyledTextCtrl* ctrl, const wxString& find_what, siz
     int selStart, selEnd;
     ctrl->GetSelection(&selStart, &selEnd);
     return (selEnd > selStart);
+}
+
+void QuickFindBar::OnPaint(wxPaintEvent& e)
+{
+    wxAutoBufferedPaintDC dc(this);
+    dc.SetBrush(clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
+    dc.SetPen(clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE));
+    dc.DrawRectangle(GetClientRect());
 }

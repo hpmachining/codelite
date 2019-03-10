@@ -36,6 +36,7 @@
 #include <list>
 #include <map>
 #include "optionsconfig.h"
+#include "LSP/basic_types.h"
 
 class wxStyledTextCtrl;
 
@@ -96,8 +97,8 @@ public:
     virtual bool IsModified() = 0;
 
     /**
-	 * @brief Get the editor's modification count
-	 */
+     * @brief Get the editor's modification count
+     */
     virtual wxUint64 GetModificationCount() const = 0;
 
     /**
@@ -175,13 +176,20 @@ public:
     /**
      * \brief return the current word under the caret. May return wxEmptyString
      */
-    virtual wxString GetWordAtCaret() = 0;
+    virtual wxString GetWordAtCaret(bool wordCharsOnly = true) = 0;
 
     /**
      * @brief return the word under the mouse pointer.
      * If a selection exists, return it instead
      */
     virtual void GetWordAtMousePointer(wxString& word, wxRect& wordRect) = 0;
+
+    /**
+     * @brief get word at a given position
+     * @param pos word's position
+     * @param wordCharsOnly when set to false, return the string between the nearest whitespaces
+     */
+    virtual wxString GetWordAtPosition(int pos, bool wordCharsOnly = true) = 0;
 
     /**
      * @brief return the EOL mode of the editor.
@@ -333,6 +341,12 @@ public:
      * @return return true if a match was found, false otherwise
      */
     virtual bool FindAndSelect(const wxString& pattern, const wxString& what, int from_pos, NavMgr* navmgr) = 0;
+    
+    /**
+     * @brief select range
+     */
+    virtual bool SelectRange(const LSP::Range& range) = 0;
+    
     /**
      * @brief Similar to the above but returns void, and is implemented asynchronously
      */
@@ -476,9 +490,7 @@ public:
     wxClientData* GetClientData(const wxString& key) const
     {
         IEditor::ClientDataMap_t::const_iterator iter = m_data.find(key);
-        if(iter != m_data.end()) {
-            return iter->second;
-        }
+        if(iter != m_data.end()) { return iter->second; }
         return NULL;
     }
 

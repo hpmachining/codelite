@@ -27,17 +27,20 @@
 #include <algorithm>
 #include <wx/dcbuffer.h>
 #include <wx/wupdlock.h>
+#include "clThemeUpdater.h"
 
 WindowStack::WindowStack(wxWindow* parent, wxWindowID id)
     : wxWindow(parent, id)
 {
     Bind(wxEVT_SIZE, &WindowStack::OnSize, this);
-    // Disable the events by capturing them and not calling 'Skip()'
-    //    Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [](wxBookCtrlEvent& event) { wxUnusedVar(event); });
-    //    Bind(wxEVT_NOTEBOOK_PAGE_CHANGING, [](wxBookCtrlEvent& event) { wxUnusedVar(event); });
+    clThemeUpdater::Get().RegisterWindow(this);
 }
 
-WindowStack::~WindowStack() { Unbind(wxEVT_SIZE, &WindowStack::OnSize, this); }
+WindowStack::~WindowStack()
+{
+    Unbind(wxEVT_SIZE, &WindowStack::OnSize, this);
+    clThemeUpdater::Get().UnRegisterWindow(this);
+}
 
 void WindowStack::Select(wxWindow* win)
 {
@@ -122,10 +125,8 @@ void WindowStack::DoHideNoActiveWindows()
     std::for_each(m_windows.begin(), m_windows.end(), [&](wxWindow* w) {
         if(w != m_activeWin) { w->Hide(); }
     });
-    
+
 #ifdef __WXOSX__
-    if(m_activeWin) {
-        m_activeWin->Refresh();
-    }
+    if(m_activeWin) { m_activeWin->Refresh(); }
 #endif
 }

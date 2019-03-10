@@ -47,6 +47,7 @@
 #include <wx/bitmap.h>
 #include <wx/cmndata.h>
 #include <wx/stc/stc.h>
+#include "LSP/CompletionItem.h"
 
 #define DEBUGGER_INDICATOR 11
 #define MATCH_INDICATOR 10
@@ -353,7 +354,7 @@ public:
      */
     void SetEOL();
 
-    void CompleteWord(bool onlyRefresh = false);
+    void CompleteWord(LSP::CompletionItem::eTriggerKind triggerKind, bool onlyRefresh = false);
 
     /**
      * \brief chage the case of the current selection. If selection is empty,
@@ -379,7 +380,7 @@ public:
      * i.e. the event wxEVT_CC_CODE_COMPLETE is fired only when refreshingList == false
      */
     void CodeComplete(bool refreshingList = false);
-    
+
     /**
      * @brief toggle line comment
      * @param commentSymbol the comment symbol to insert (e.g. "//")
@@ -603,6 +604,7 @@ public:
     void QuickFindAll();
 
     bool FindAndSelect();
+    bool SelectRange(const LSP::Range& range);
     bool FindAndSelect(const FindReplaceData& data);
     bool FindAndSelect(const wxString& pattern, const wxString& name);
     void FindAndSelectV(const wxString& pattern, const wxString& name, int pos = 0,
@@ -737,7 +739,7 @@ public:
     virtual void SetErrorMarker(int lineno, const wxString& annotationText);
     virtual void DelAllCompilerMarkers();
 
-    void DoShowCalltip(int pos, const wxString& title, const wxString& tip);
+    void DoShowCalltip(int pos, const wxString& title, const wxString& tip, bool manipulateText);
     void DoCancelCalltip();
     void DoCancelCodeCompletionBox();
     int DoGetOpenBracePos();
@@ -820,12 +822,18 @@ public:
      * @brief
      * @return
      */
-    virtual wxString GetWordAtCaret();
+    virtual wxString GetWordAtCaret(bool wordCharsOnly = true);
     /**
      * @brief
      * @return
      */
     virtual void GetWordAtMousePointer(wxString& word, wxRect& wordRect);
+    /**
+     * @brief get word at a given position
+     * @param pos word's position
+     * @param wordCharsOnly when set to false, return the string between the nearest whitespaces
+     */
+    virtual wxString GetWordAtPosition(int pos, bool wordCharsOnly = true);
     /**
      * @brief
      * @param text
@@ -999,7 +1007,7 @@ private:
     wxMenu* DoCreateDebuggerWatchMenu(const wxString& word);
 
     wxFontEncoding DetectEncoding(const wxString& filename);
-    
+
     // Line numbers drawings
     void DoUpdateRelativeLineNumbers();
     void DoUpdateLineNumbers();

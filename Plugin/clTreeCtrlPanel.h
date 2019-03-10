@@ -123,7 +123,12 @@ public:
      * @brief return true if a folder is opened in this view
      */
     bool IsFolderOpened() const;
-
+    
+    /**
+     * @brief refresh the entire tree, unconditionally 
+     */
+    void RefreshTree();
+    
 protected:
     void UpdateItemDeleted(const wxTreeItemId& item);
     void GetTopLevelFolders(wxArrayString& paths, wxArrayTreeItemIds& items) const;
@@ -143,7 +148,7 @@ protected:
     // Make the event handler functions virtual
     // so any subclass could override them
     virtual void OnActiveEditorChanged(wxCommandEvent& event);
-    virtual void OnFindInFilesShowing(clCommandEvent& event);
+    virtual void OnFindInFilesShowing(clFindInFilesEvent& event);
     virtual void OnInitDone(wxCommandEvent& event);
     virtual void OnContextMenu(wxTreeEvent& event);
     virtual void OnItemActivated(wxTreeEvent& event);

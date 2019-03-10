@@ -316,6 +316,7 @@ void MemCheckPlugin::CheckProject(const wxString& projectName)
     wxString wd;
     wxString command = PrepareCommand(projectName, wd);
 
+    m_outputView->Clear(); // To reduce the risk of confusion, clear any current errors before running
     DirSaver ds;
     EnvSetter envGuard(m_mgr->GetEnv());
     wxSetWorkingDirectory(path);
@@ -376,7 +377,6 @@ void MemCheckPlugin::OnProcessOutput(clCommandEvent& event)
 void MemCheckPlugin::OnProcessTerminated(clCommandEvent& event)
 {
     m_mgr->AppendOutputTabText(kOutputTab_Output, _("\n-- MemCheck process completed\n"));
-    wxWindowDisabler disableAll;
     wxBusyInfo wait(wxT(BUSY_MESSAGE));
     m_mgr->GetTheApp()->Yield();
 

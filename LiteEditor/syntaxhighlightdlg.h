@@ -37,6 +37,12 @@ class wxChoice;
 class wxNotebook;
 class wxTreebook;
 
+enum eTheme {
+    kTHEME_UNKNOWN = -1,
+    kTHEME_DARK,
+    kTHEME_LIGHT,
+};
+
 /** Implementing SyntaxHighlightBaseDlg */
 class SyntaxHighlightDlg : public SyntaxHighlightBaseDlg
 {
@@ -45,6 +51,10 @@ class SyntaxHighlightDlg : public SyntaxHighlightBaseDlg
     bool m_globalBgColourChanged;
     static bool m_globalBgColourChangedTooltipShown;
     LexerConf::Ptr_t m_lexer;
+    eTheme m_initialTheme = kTHEME_UNKNOWN;
+    eTheme m_endingTheme = kTHEME_UNKNOWN;
+    bool m_useBaseColourInitial = false;
+    bool m_useBaseColourEnding = false;
 
 protected:
     virtual void OnCustomBaseColourPIcked(wxColourPickerEvent& event);
@@ -102,8 +112,7 @@ public:
     /** Constructor */
     SyntaxHighlightDlg(wxWindow* parent);
     virtual ~SyntaxHighlightDlg();
-
-    bool restartRequired;
+    bool IsRestartRequired() const;
 };
 
 #endif // __syntaxhighlightdlg__

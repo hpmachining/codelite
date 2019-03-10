@@ -27,7 +27,6 @@
 #include "clAuiMainNotebookTabArt.h"
 #include "clFileOrFolderDropTarget.h"
 #include "clImageViewer.h"
-#include "clang_code_completion.h"
 #include "close_all_dlg.h"
 #include "ctags_manager.h"
 #include "editor_config.h"
@@ -41,7 +40,6 @@
 #include "ieditor.h"
 #include "mainbook.h"
 #include "manager.h"
-#include "message_pane.h"
 #include "new_quick_watch_dlg.h"
 #include "pluginmanager.h"
 #include "quickfindbar.h"
@@ -52,6 +50,7 @@
 #include <wx/regex.h>
 #include <wx/wupdlock.h>
 #include <wx/xrc/xmlres.h>
+#include "clThemeUpdater.h"
 
 MainBook::MainBook(wxWindow* parent)
     : wxPanel(parent)
@@ -64,6 +63,7 @@ MainBook::MainBook(wxWindow* parent)
     , m_welcomePage(NULL)
     , m_findBar(NULL)
 {
+    clThemeUpdater::Get().RegisterWindow(this);
     CreateGuiControls();
     ConnectEvents();
 }
@@ -72,9 +72,6 @@ void MainBook::CreateGuiControls()
 {
     wxBoxSizer* sz = new wxBoxSizer(wxVERTICAL);
     SetSizer(sz);
-
-    m_messagePane = new MessagePane(this);
-    sz->Add(m_messagePane, 0, wxALL | wxEXPAND, 5, NULL);
     long style = kNotebook_AllowDnD |                  // Allow tabs to move
                  kNotebook_MouseMiddleClickClosesTab | // Handle mouse middle button when clicked on a tab
                  kNotebook_MouseMiddleClickFireEvent | // instead of closing the tab, fire an event
@@ -913,10 +910,6 @@ bool MainBook::CloseAll(bool cancellable)
 
     // Delete the files without notifications (it will be faster)
     clWindowUpdateLocker locker(this);
-#if HAS_LIBCLANG
-    ClangCodeCompletion::Instance()->CancelCodeComplete();
-#endif
-
     SendCmdEvent(wxEVT_ALL_EDITORS_CLOSING);
 
     m_reloadingDoRaise = false;
@@ -1083,13 +1076,6 @@ bool MainBook::DoSelectPage(wxWindow* win)
     return true;
 }
 
-void MainBook::ShowMessage(const wxString& message, bool showHideButton, const wxBitmap& bmp, const ButtonDetails& btn1,
-                           const ButtonDetails& btn2, const ButtonDetails& btn3, const CheckboxDetails& cb)
-{
-    m_messagePane->ShowMessage(message, showHideButton, bmp, btn1, btn2, btn3, cb);
-    clMainFrame::Get()->SendSizeEvent();
-}
-
 void MainBook::OnPageChanged(wxBookCtrlEvent& e)
 {
     e.Skip();
@@ -1163,9 +1149,6 @@ void MainBook::OnPageChanging(wxBookCtrlEvent& e)
 {
     clEditor* editor = GetActiveEditor();
     if(editor) { editor->CallTipCancel(); }
-#if HAS_LIBCLANG
-    ClangCodeCompletion::Instance()->CancelCodeComplete();
-#endif
     e.Skip();
 }
 

@@ -196,6 +196,7 @@ TagsOptionsData::TagsOptionsData()
     m_tokens.Add("LLDB_API");
     m_tokens.Add("PYTHON_API");
     m_tokens.Add("__cpp_deduction_guides=0");
+    m_tokens.Add("wxMSVC_FWD_MULTIPLE_BASES");
     
     // libcpp macros
     m_tokens.Add("_LIBCPP_TYPE_VIS_ONLY");
@@ -368,7 +369,7 @@ void TagsOptionsData::DoUpdateTokensWxMapReversed()
 
 const wxStringTable_t& TagsOptionsData::GetTokensReversedWxMap() const { return m_tokensWxMapReversed; }
 
-void TagsOptionsData::FromJSON(const JSONElement& json)
+void TagsOptionsData::FromJSON(const JSONItem& json)
 {
     m_version = json.namedObject("version").toSize_t();
     m_ccFlags = json.namedObject(wxT("m_ccFlags")).toSize_t(m_ccFlags);
@@ -400,9 +401,9 @@ void TagsOptionsData::FromJSON(const JSONElement& json)
     m_ccFlags |= CC_ACCURATE_SCOPE_RESOLVING;
 }
 
-JSONElement TagsOptionsData::ToJSON() const
+JSONItem TagsOptionsData::ToJSON() const
 {
-    JSONElement json = JSONElement::createObject(GetName());
+    JSONItem json = JSONItem::createObject(GetName());
     json.addProperty("version", m_version);
     json.addProperty("m_ccFlags", m_ccFlags);
     json.addProperty("m_ccColourFlags", m_ccColourFlags);

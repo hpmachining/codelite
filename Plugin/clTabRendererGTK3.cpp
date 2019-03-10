@@ -6,6 +6,7 @@
 #include <wx/dcmemory.h>
 #include <wx/font.h>
 #include <wx/settings.h>
+#include "clSystemSettings.h"
 
 #define DRAW_LINE(__p1, __p2) \
     dc.DrawLine(__p1, __p2);  \
@@ -42,7 +43,7 @@ void clTabRendererGTK3::Draw(wxWindow* parent, wxDC& dc, wxDC& fontDC, const clT
     wxColour bgColour(colours.tabAreaColour);
     wxColour penColour(colours.tabAreaColour);
 
-    wxFont font = GetTabFont(true);
+    wxFont font = GetTabFont(false);
     fontDC.SetTextForeground(tabInfo.IsActive() ? colours.activeTabTextColour : colours.inactiveTabTextColour);
     // font.SetWeight(wxFONTWEIGHT_BOLD);
     fontDC.SetFont(font);
@@ -134,7 +135,7 @@ void clTabRendererGTK3::AdjustColours(clTabColours& colours, size_t style)
     }
 
     if(useDefaults) {
-        colours.activeTabBgColour = DrawingUtils::GetPanelBgColour();
+        colours.activeTabBgColour = clSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
         colours.activeTabInnerPenColour = colours.activeTabBgColour;
         colours.tabAreaColour = colours.inactiveTabBgColour;
         colours.activeTabPenColour = colours.activeTabBgColour;

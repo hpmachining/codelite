@@ -23,8 +23,8 @@
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef ZJSONNODE_H
-#define ZJSONNODE_H
+#ifndef WXC_JSONNODE_H
+#define WXC_JSONNODE_H
 
 #include <wx/string.h>
 #include <wx/variant.h>
@@ -132,6 +132,11 @@ public:
      */
     void removeProperty(const wxString& name);
 
+    /**
+     * @brief detach element from json. Return the detached element
+     */
+    JSONElement detachProperty(const wxString& name);
+
     //////////////////////////////////////////////////
     // Array operations
     //////////////////////////////////////////////////
@@ -151,6 +156,7 @@ public:
 
 class JSONRoot
 {
+protected:
     cJSON* _json;
     wxString _errorString;
 
@@ -167,6 +173,10 @@ public:
     JSONElement toElement() const;
 
     void clear();
+    /**
+     * @brief release the internal pointer and return it wrapped by JSONElement
+     */
+    JSONElement release();
 
 private:
     // Make this class not copyable
@@ -174,4 +184,4 @@ private:
     JSONRoot& operator=(const JSONRoot& src);
 };
 
-#endif // ZJSONNODE_H
+#endif // WXC_JSONNODE_H

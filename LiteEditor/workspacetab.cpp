@@ -44,6 +44,9 @@
 #include <wx/combobox.h>
 #include <wx/sizer.h>
 #include <wx/xrc/xmlres.h>
+#include <wx/dcbuffer.h>
+#include "drawingutils.h"
+#include <wx/dcbuffer.h>
 
 WorkspaceTab::WorkspaceTab(wxWindow* parent, const wxString& caption)
     : WorkspaceTabBase(parent)
@@ -52,6 +55,9 @@ WorkspaceTab::WorkspaceTab(wxWindow* parent, const wxString& caption)
     , m_dlg(NULL)
     , m_view(NULL)
 {
+    SetBackgroundStyle(wxBG_STYLE_PAINT);
+    m_panelCxx->SetBackgroundStyle(wxBG_STYLE_PAINT);
+
     long link = EditorConfigST::Get()->GetInteger(wxT("LinkWorkspaceViewToEditor"), 1);
     m_isLinkedToEditor = link ? true : false;
 
@@ -61,6 +67,23 @@ WorkspaceTab::WorkspaceTab(wxWindow* parent, const wxString& caption)
     SetDropTarget(new clFileOrFolderDropTarget(this));
     Bind(wxEVT_DND_FOLDER_DROPPED, &WorkspaceTab::OnFolderDropped, this);
     EventNotifier::Get()->Bind(wxEVT_WORKSPACE_BUILD_CONFIG_CHANGED, &WorkspaceTab::OnConfigChanged, this);
+
+    m_panelCxx->Bind(wxEVT_PAINT, [&](wxPaintEvent& e) {
+        wxAutoBufferedPaintDC dc(m_panelCxx);
+        dc.SetBrush(m_bgColour);
+        dc.SetPen(m_bgColour);
+        dc.DrawRectangle(m_panelCxx->GetClientRect());
+    });
+
+    m_bgColour = DrawingUtils::GetPanelBgColour();
+    EventNotifier::Get()->Bind(wxEVT_CMD_COLOURS_FONTS_UPDATED, [&](clCommandEvent& event) {
+        event.Skip();
+        bool useCustomColour = clConfig::Get().Read("UseCustomBaseColour", false);
+        m_bgColour = DrawingUtils::GetPanelBgColour();
+        if(useCustomColour) { m_bgColour = clConfig::Get().Read("BaseColour", m_bgColour); }
+        Refresh();
+        m_panelCxx->Refresh();
+    });
 }
 
 WorkspaceTab::~WorkspaceTab()
@@ -118,22 +141,19 @@ void WorkspaceTab::CreateGUIControls()
     BitmapLoader* bmps = clGetManager()->GetStdIcons();
     m_toolbar580->AddTool(XRCID("ID_TOOL_LINK_EDITOR"), _("Link Editor"), bmps->LoadBitmap("link_editor"), "",
                           wxITEM_CHECK);
-    m_toolbar580->AddSeparator();
     m_toolbar580->AddTool(XRCID("ID_TOOL_COLLAPSE_ALL"), _("Collapse All"), bmps->LoadBitmap("fold"));
     m_toolbar580->AddTool(XRCID("ID_TOOL_GOTO_ACTIVE_PROJECT"), _("Goto Active Project"), bmps->LoadBitmap("home"));
     m_toolbar580->AddTool(XRCID("ID_TOOL_ACTIVE_PROJECT_SETTINGS"),
                           _("Open selected project settings. If there is no project selected, open the parent project "
                             "of the selected item in the tree"),
                           bmps->LoadBitmap("cog"));
-    m_toolbar580->AddSeparator();
+    m_toolbar580->AddSpacer();
+    m_toolbar580->AddTool(XRCID("execute_no_debug"), _("Run Active Project"), bmps->LoadBitmap("execute"),
+                          _("Run Active Project"));
     m_toolbar580->AddTool(XRCID("build_active_project"), _("Build Active Project"), bmps->LoadBitmap("build"),
                           _("Build Active Project"), wxITEM_DROPDOWN);
     m_toolbar580->AddTool(XRCID("stop_active_project_build"), _("Stop Current Build"), bmps->LoadBitmap("stop"),
                           _("Stop Current Build"));
-    m_toolbar580->AddTool(XRCID("clean_active_project"), _("Clean Active Project"), bmps->LoadBitmap("clean"),
-                          _("Clean Active Project"));
-    m_toolbar580->AddTool(XRCID("execute_no_debug"), _("Run Active Project"), bmps->LoadBitmap("execute"),
-                          _("Run Active Project"));
     m_toolbar580->Realize();
 }
 
@@ -206,13 +226,13 @@ void WorkspaceTab::OnCollapseAll(wxCommandEvent& e)
     wxUnusedVar(e);
     if(!m_fileView->GetRootItem().IsOk()) return;
     m_fileView->CollapseAll();
-    
+
     // count will probably be 0 below, so ensure we can at least see the root item
     m_fileView->EnsureVisible(m_fileView->GetRootItem());
     m_fileView->SelectItem(m_fileView->GetRootItem());
     // Expand the workspace
     m_fileView->Expand(m_fileView->GetRootItem());
-    
+
     wxArrayTreeItemIds arr;
     size_t count = m_fileView->GetSelections(arr);
     if(count == 1) {
@@ -491,4 +511,12 @@ void WorkspaceTab::OnConfigChanged(clCommandEvent& e)
         return;
     }
     DoConfigChanged(selection);
+}
+
+void WorkspaceTab::OnPaint(wxPaintEvent& event)
+{
+    wxAutoBufferedPaintDC dc(this);
+    dc.SetBrush(m_bgColour);
+    dc.SetPen(m_bgColour);
+    dc.DrawRectangle(GetClientRect());
 }

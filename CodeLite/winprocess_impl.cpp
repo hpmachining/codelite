@@ -30,6 +30,10 @@
 #include "winprocess_impl.h"
 #include <memory>
 #include <wx/filefn.h>
+#include "fileutils.h"
+#include "file_logger.h"
+#include <wx/msgqueue.h>
+#include <atomic>
 
 #ifdef _WIN32_WINNT
 #undef _WIN32_WINNT
@@ -69,6 +73,103 @@ public:
         if(isAttached) { FreeConsole(); }
         isAttached = false;
     }
+};
+
+static bool CheckIsAlive(HANDLE hProcess)
+{
+    DWORD dwExitCode;
+    if(GetExitCodeProcess(hProcess, &dwExitCode)) {
+        if(dwExitCode == STILL_ACTIVE) return true;
+    }
+    return false;
+}
+
+template <typename T> bool WriteStdin(const T& buffer, HANDLE hStdin, HANDLE hProcess)
+{
+    DWORD dwMode;
+
+    // Make the pipe to non-blocking mode
+    dwMode = PIPE_READMODE_BYTE | PIPE_NOWAIT;
+    SetNamedPipeHandleState(hStdin, &dwMode, NULL, NULL);
+    DWORD bytesLeft = buffer.length();
+    long offset = 0;
+    size_t retryCount = 0;
+    while(bytesLeft > 0 && (retryCount < 100)) {
+        DWORD dwWritten = 0;
+        if(!WriteFile(hStdin, buffer.c_str() + offset, bytesLeft, &dwWritten, NULL)) {
+            int errorCode = GetLastError();
+            clERROR() << ">> WriteStdin: (WriteFile) error:" << errorCode;
+            return false;
+        }
+        if(!CheckIsAlive(hProcess)) { return false; }
+        if(dwWritten == 0) { std::this_thread::sleep_for(std::chrono::milliseconds(10)); }
+        bytesLeft -= dwWritten;
+        offset += dwWritten;
+        ++retryCount;
+    }
+    return true;
+}
+
+class WXDLLIMPEXP_CL WinWriterThread
+{
+    std::thread* m_thread = nullptr;
+    wxMessageQueue<wxString> m_Q1;
+    wxMessageQueue<std::string> m_Q2;
+    std::atomic_bool m_shutdown;
+    HANDLE m_hProcess = INVALID_HANDLE_VALUE;
+    HANDLE m_hStdin = INVALID_HANDLE_VALUE;
+
+public:
+    WinWriterThread(HANDLE hProcess, HANDLE hStdin)
+        : m_hProcess(hProcess)
+        , m_hStdin(hStdin)
+    {
+        m_shutdown.store(false);
+    }
+
+    ~WinWriterThread() {}
+
+    void Start() { m_thread = new std::thread(&WinWriterThread::Entry, this, m_hStdin); }
+    void Stop()
+    {
+        if(m_thread) {
+            m_shutdown.store(true);
+            m_thread->join();
+            wxDELETE(m_thread);
+        }
+    }
+    static void Entry(WinWriterThread* thr, HANDLE hStdin)
+    {
+        while(!thr->m_shutdown.load()) {
+            {
+                wxString wxstr;
+                if(thr->m_Q1.ReceiveTimeout(1, wxstr) == wxMSGQUEUE_NO_ERROR) {
+                    if(!WriteStdin(wxstr, hStdin, thr->m_hProcess)) {
+                        clERROR() << "WriteFile error:" << GetLastError();
+                        // TODO: how do we report an error here !?
+                    } else {
+                        clDEBUG() << "Writer thread: wrote buffer of" << wxstr.length() << "bytes";
+                    }
+                }
+            }
+            {
+                std::string cstr;
+                if(thr->m_Q2.ReceiveTimeout(1, cstr) == wxMSGQUEUE_NO_ERROR) {
+                    if(!WriteStdin(cstr, hStdin, thr->m_hProcess)) {
+                        clERROR() << "WriteFile error:" << GetLastError();
+                        // TODO: how do we report an error here !?
+                    } else {
+                        clDEBUG() << "Writer thread: wrote buffer of" << cstr.length() << "bytes";
+                    }
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        clDEBUG() << "Write thread going down";
+    }
+
+    void Write(const std::string& buffer) { m_Q2.Post(buffer); }
+    void Write(const wxString& buffer) { m_Q1.Post(buffer); }
 };
 
 /*static*/
@@ -250,7 +351,7 @@ IProcess* WinProcessImpl::Execute(wxEvtHandler* parent, const wxString& cmd, wxS
             return NULL;
         }
     }
-    
+
     if((prc->m_flags & IProcessCreateConsole) || (prc->m_flags & IProcessCreateWithHiddenConsole)) {
         ConsoleAttacher ca(prc->GetPid());
         if(ca.isAttached) {
@@ -260,6 +361,8 @@ IProcess* WinProcessImpl::Execute(wxEvtHandler* parent, const wxString& cmd, wxS
     }
     prc->SetPid(prc->dwProcessId);
     if(!(prc->m_flags & IProcessCreateSync)) { prc->StartReaderThread(); }
+    prc->m_writerThread = new WinWriterThread(prc->piProcInfo.hProcess, prc->hChildStdinWrDup);
+    prc->m_writerThread->Start();
     return prc;
 }
 
@@ -279,16 +382,18 @@ WinProcessImpl::WinProcessImpl(wxEvtHandler* parent)
 
 WinProcessImpl::~WinProcessImpl() { Cleanup(); }
 
-bool WinProcessImpl::Read(wxString& buff)
+bool WinProcessImpl::Read(wxString& buff, wxString& buffErr)
 {
     DWORD le1(-1);
     DWORD le2(-1);
     buff.Clear();
-    
+    buffErr.Clear();
+
     // Sanity
     if(!IsRedirect()) { return false; }
-    
-    if(!DoReadFromPipe(hChildStderrRdDup, buff)) { le2 = GetLastError(); }
+
+    // Read data from STDOUT and STDERR
+    if(!DoReadFromPipe(hChildStderrRdDup, ((m_flags & IProcessStderrEvent) ? buffErr : buff))) { le2 = GetLastError(); }
     if(!DoReadFromPipe(hChildStdoutRdDup, buff)) { le1 = GetLastError(); }
     if((le1 == ERROR_NO_DATA) && (le2 == ERROR_NO_DATA)) {
         if(IsAlive()) {
@@ -296,7 +401,7 @@ bool WinProcessImpl::Read(wxString& buff)
             return true;
         }
     }
-    bool success = !buff.IsEmpty();
+    bool success = !buff.IsEmpty() || !buffErr.IsEmpty();
     if(!success) {
         DWORD dwExitCode;
         if(GetExitCodeProcess(piProcInfo.hProcess, &dwExitCode)) { SetProcessExitCode(GetPid(), (int)dwExitCode); }
@@ -308,26 +413,15 @@ bool WinProcessImpl::Write(const wxString& buff)
 {
     // Sanity
     if(!IsRedirect()) { return false; }
-    
-    DWORD dwMode;
-    DWORD dwTimeout;
-    
-    wxUnusedVar(dwTimeout);
-    char chBuf[4097];
+    m_writerThread->Write(buff);
+    return true;
+}
 
-    wxString tmpCmd = buff;
-    tmpCmd = tmpCmd.Trim().Trim(false);
-    tmpCmd += wxT("\r\n");
-
-    strcpy(chBuf, tmpCmd.mb_str());
-
-    // Make the pipe to non-blocking mode
-    dwMode = PIPE_READMODE_BYTE | PIPE_NOWAIT;
-    dwTimeout = 30000;
-    SetNamedPipeHandleState(hChildStdinWrDup, &dwMode, NULL,
-                            NULL); // Timeout of 30 seconds
-    DWORD dwWritten;
-    if(!WriteFile(hChildStdinWrDup, chBuf, (unsigned long)strlen(chBuf), &dwWritten, NULL)) return false;
+bool WinProcessImpl::Write(const std::string& buff)
+{
+    // Sanity
+    if(!IsRedirect()) { return false; }
+    m_writerThread->Write(buff);
     return true;
 }
 
@@ -342,6 +436,11 @@ bool WinProcessImpl::IsAlive()
 
 void WinProcessImpl::Cleanup()
 {
+    if(m_writerThread) {
+        m_writerThread->Stop();
+        wxDELETE(m_writerThread);
+    }
+
     // Under windows, the reader thread is detached
     if(m_thr) {
         // Stop the reader thread
@@ -362,7 +461,7 @@ void WinProcessImpl::Cleanup()
         }
         TerminateProcess(piProcInfo.hProcess, 255);
     }
-    
+
     if(IsRedirect()) {
         CloseHandle(hChildStdinRd);
         CloseHandle(hChildStdinWrDup);
@@ -371,10 +470,10 @@ void WinProcessImpl::Cleanup()
         CloseHandle(hChildStderrWr);
         CloseHandle(hChildStderrRdDup);
     }
-    
+
     CloseHandle(piProcInfo.hProcess);
     CloseHandle(piProcInfo.hThread);
-    
+
     hChildStdinRd = NULL;
     hChildStdoutWr = NULL;
     hChildStdinWrDup = NULL;

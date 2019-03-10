@@ -45,7 +45,6 @@ static void MSWSetNativeTheme(wxWindow* win)
 #endif
 }
 
-
 clTreeCtrl::clTreeCtrl(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style)
     : clControlWithItems(parent, wxID_ANY, pos, size, style | wxWANTS_CHARS)
     , m_model(this)
@@ -199,9 +198,7 @@ wxTreeItemId clTreeCtrl::InsertItem(const wxTreeItemId& parent, const wxTreeItem
 {
     wxTreeItemId item = m_model.InsertItem(parent, previous, text, image, selImage, data);
     DoUpdateHeader(item);
-    if(IsExpanded(parent)) {
-        UpdateScrollBar();
-    }
+    if(IsExpanded(parent)) { UpdateScrollBar(); }
     return item;
 }
 
@@ -210,9 +207,7 @@ wxTreeItemId clTreeCtrl::AppendItem(const wxTreeItemId& parent, const wxString& 
 {
     wxTreeItemId item = m_model.AppendItem(parent, text, image, selImage, data);
     DoUpdateHeader(item);
-    if(IsExpanded(parent)) {
-        UpdateScrollBar();
-    }
+    if(IsExpanded(parent)) { UpdateScrollBar(); }
     return item;
 }
 
@@ -235,6 +230,7 @@ void clTreeCtrl::Expand(const wxTreeItemId& item)
     DoUpdateHeader(item);
     UpdateScrollBar();
     Refresh();
+    if(GetVScrollBar() && GetVScrollBar()->IsShown()) { GetVScrollBar()->CallAfter(&clScrollBar::Update); }
 }
 
 void clTreeCtrl::Collapse(const wxTreeItemId& item)
@@ -403,7 +399,9 @@ void clTreeCtrl::EnsureVisible(const wxTreeItemId& item)
     if(!item.IsOk()) { return; }
     // Make sure that all parents of ítem are expanded
     if(!m_model.ExpandToItem(item)) { return; }
-    Refresh();
+
+    // We need to paint to take place now so all the items will be assigned with the updated geometry
+    Update();
     DoEnsureVisible(item);
 }
 
@@ -903,7 +901,6 @@ clRowEntry* clTreeCtrl::GetFirstItemOnScreen() { return m_model.GetFirstItemOnSc
 void clTreeCtrl::SetFirstItemOnScreen(clRowEntry* item) { m_model.SetFirstItemOnScreen(item); }
 
 void clTreeCtrl::SetSortFunction(const clSortFunc_t& CompareFunc) { m_model.SetSortFunction(CompareFunc); }
-
 void clTreeCtrl::ScrollToRow(int firstLine)
 {
     clRowEntry* newTopLine = nullptr;
@@ -919,13 +916,15 @@ void clTreeCtrl::ScrollToRow(int firstLine)
             size_t maxItems = GetNumLineCanFitOnScreen();
             m_model.GetNextItems(newTopLine, maxItems, items);
             AssignRects(items);
-            if(!items.empty() && !IsItemFullyVisible(items.back())) {
+            if(!items.empty() && !IsItemFullyVisible(items.back()) && (firstLine != 0)) {
                 newTopLine = m_model.GetRowAfter(newTopLine, true);
                 if(newTopLine) { SetFirstItemOnScreen(newTopLine); }
             }
         }
     }
+#if CL_USE_NATIVE_SCROLLBAR
     UpdateScrollBar();
+#endif
     Refresh();
 }
 
@@ -1088,6 +1087,9 @@ void clTreeCtrl::DeleteAllItems()
     m_model.EnableEvents(true);
     DoUpdateHeader(nullptr);
     m_scrollLines = 0;
+    SetFirstColumn(0);
+    UpdateScrollBar();
+    Refresh();
 }
 
 wxTreeItemId clTreeCtrl::GetNextItem(const wxTreeItemId& item) const { return m_model.GetItemAfter(item, true); }
@@ -1182,7 +1184,7 @@ void clTreeCtrl::Check(const wxTreeItemId& item, bool check, size_t col)
     clRowEntry* row = m_model.ToPtr(item);
     if(!row) { return; }
     row->SetChecked(check, row->GetBitmapIndex(col), row->GetLabel(col), col);
-    
+
     // Fire value changed event
     wxTreeEvent evt(wxEVT_TREE_ITEM_VALUE_CHANGED);
     evt.SetInt(col);

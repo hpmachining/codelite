@@ -3,7 +3,6 @@
 #include "NodeJSWorkspaceConfiguration.h"
 #include "NodeJSWorkspaceView.h"
 #include "NoteJSWorkspace.h"
-#include "WebToolsConfig.h"
 #include "bitmap_loader.h"
 #include "clWorkspaceView.h"
 #include "codelite_events.h"
@@ -18,54 +17,56 @@
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
 #include <wx/wupdlock.h>
+#include "clNodeJS.h"
+#include <wx/textdlg.h>
+#include "clConsoleBase.h"
 
 NodeJSWorkspaceView::NodeJSWorkspaceView(wxWindow* parent, const wxString& viewName)
     : clTreeCtrlPanel(parent)
+    , m_config("nodejs-explorer")
 {
+    SetConfig(&m_config);
     SetNewFileTemplate("Untitled.js", wxStrlen("Untitled"));
     SetViewName(viewName);
     EventNotifier::Get()->Bind(wxEVT_CONTEXT_MENU_FOLDER, &NodeJSWorkspaceView::OnContextMenu, this);
     EventNotifier::Get()->Bind(wxEVT_CONTEXT_MENU_FILE, &NodeJSWorkspaceView::OnContextMenuFile, this);
+    EventNotifier::Get()->Bind(wxEVT_FILE_SYSTEM_UPDATED, &NodeJSWorkspaceView::OnFileSystemUpdated, this);
+    EventNotifier::Get()->Bind(wxEVT_FINDINFILES_DLG_DISMISSED, &NodeJSWorkspaceView::OnFindInFilesDismissed, this);
+    Bind(wxEVT_TERMINAL_EXIT, &NodeJSWorkspaceView::OnTerminalClosed, this);
 }
 
 NodeJSWorkspaceView::~NodeJSWorkspaceView()
 {
     EventNotifier::Get()->Unbind(wxEVT_CONTEXT_MENU_FOLDER, &NodeJSWorkspaceView::OnContextMenu, this);
     EventNotifier::Get()->Unbind(wxEVT_CONTEXT_MENU_FILE, &NodeJSWorkspaceView::OnContextMenuFile, this);
+    EventNotifier::Get()->Unbind(wxEVT_FILE_SYSTEM_UPDATED, &NodeJSWorkspaceView::OnFileSystemUpdated, this);
+    EventNotifier::Get()->Unbind(wxEVT_FINDINFILES_DLG_DISMISSED, &NodeJSWorkspaceView::OnFindInFilesDismissed, this);
+    Unbind(wxEVT_TERMINAL_EXIT, &NodeJSWorkspaceView::OnTerminalClosed, this);
 }
 
 void NodeJSWorkspaceView::OnContextMenu(clContextMenuEvent& event)
 {
     event.Skip();
-    WebToolsConfig webToolsConf;
-    webToolsConf.Load();
     if((event.GetEventObject() == this)) {
         wxMenu* menu = event.GetMenu();
 
         // Locate the "Close" menu entry
-        int pos = wxNOT_FOUND;
         int openShellPos = wxNOT_FOUND;
         wxMenuItem* closeItem = NULL;
 
-        for(size_t i = 0; i < menu->GetMenuItemCount(); ++i) {
-            wxMenuItem* mi = menu->FindItemByPosition(i);
-            if((pos == wxNOT_FOUND) && mi && (mi->GetId() == XRCID("tree_ctrl_close_folder"))) {
-                pos = i;
-                closeItem = mi;
-            }
-
-            if((openShellPos == wxNOT_FOUND) && mi && (mi->GetId() == XRCID("tree_ctrl_open_shell_folder"))) {
-                openShellPos = i;
-                ++openShellPos; // insert after
-                ++openShellPos; // skip the separator
-            }
+        int pos = ::clFindMenuItemPosition(menu, XRCID("tree_ctrl_close_folder"));
+        if(pos != wxNOT_FOUND) { closeItem = menu->FindItem(XRCID("tree_ctrl_close_folder"), NULL); }
+        openShellPos = ::clFindMenuItemPosition(menu, XRCID("tree_ctrl_open_shell_folder"));
+        if(openShellPos != wxNOT_FOUND) {
+            ++openShellPos; // insert after
+            ++openShellPos; // skip the separator
         }
 
         if((pos != wxNOT_FOUND) && closeItem) {
             wxMenuItem* showHiddenItem =
                 menu->Insert(pos, XRCID("nodejs_show_hidden_files"), _("Show hidden files"), "", wxITEM_CHECK);
-            NodeJSWorkspaceConfiguration conf;
-            showHiddenItem->Check(conf.Load(NodeJSWorkspace::Get()->GetFilename()).IsShowHiddenFiles());
+            NodeJSWorkspaceConfiguration conf(NodeJSWorkspace::Get()->GetFilename());
+            showHiddenItem->Check(conf.Load().IsShowHiddenFiles());
             menu->Bind(wxEVT_MENU, &NodeJSWorkspaceView::OnShowHiddenFiles, this, XRCID("nodejs_show_hidden_files"));
 
             menu->InsertSeparator(pos);
@@ -85,6 +86,7 @@ void NodeJSWorkspaceView::OnContextMenu(clContextMenuEvent& event)
             // only a folder is selected, check to see if this is a project folder
             // we do this by testing for the existence of the file package.json
             // under the folder path
+            int npmInstallPosAfter = wxNOT_FOUND;
             wxFileName packageJSON(folders.Item(0), "package.json");
             if(packageJSON.FileExists()) {
                 // A project folder
@@ -92,22 +94,27 @@ void NodeJSWorkspaceView::OnContextMenu(clContextMenuEvent& event)
                 menu->Insert(openShellPos, XRCID("nodejs_project_settings"), _("Open package.json"));
                 menu->Insert(openShellPos, XRCID("nodejs_project_debug"), _("Debug..."));
                 menu->Insert(openShellPos, XRCID("nodejs_project_run"), _("Run..."));
-
+                npmInstallPosAfter = XRCID("nodejs_project_run");
                 menu->Bind(wxEVT_MENU, &NodeJSWorkspaceView::OnOpenPackageJsonFile, this,
                            XRCID("nodejs_project_settings"));
                 menu->Bind(wxEVT_MENU, &NodeJSWorkspaceView::OnProjectDebug, this, XRCID("nodejs_project_debug"));
                 menu->Bind(wxEVT_MENU, &NodeJSWorkspaceView::OnProjectRun, this, XRCID("nodejs_project_run"));
             } else {
-                // Check to see if we got 'npm' detected on this machine
-                bool hasNpm = !webToolsConf.GetNpm().IsEmpty();
-
                 // Offer a "npm init" menu entry
                 menu->InsertSeparator(openShellPos);
-                wxMenuItem* menuItem = new wxMenuItem(NULL, XRCID("nodejs_npm_init"), _("Run 'npm init' here"));
+                wxMenuItem* menuItem = new wxMenuItem(NULL, XRCID("nodejs_npm_init"), _("npm init"));
                 menu->Insert(openShellPos, menuItem);
+                npmInstallPosAfter = XRCID("nodejs_npm_init");
                 menuItem->SetBitmap(clGetManager()->GetStdIcons()->LoadBitmap("console"));
-                menu->Enable(XRCID("nodejs_npm_init"), hasNpm && !m_terminal.IsRunning());
+                menu->Enable(XRCID("nodejs_npm_init"), clNodeJS::Get().IsInitialised());
                 menu->Bind(wxEVT_MENU, &NodeJSWorkspaceView::OnNpmInit, this, XRCID("nodejs_npm_init"));
+            }
+
+            int npmInstallPos = ::clFindMenuItemPosition(menu, npmInstallPosAfter);
+            if(npmInstallPos != wxNOT_FOUND) {
+                npmInstallPos++; // install after it
+                menu->Insert(npmInstallPos, XRCID("nodejs_npm_install"), _("npm install"));
+                menu->Bind(wxEVT_MENU, &NodeJSWorkspaceView::OnNpmInstall, this, XRCID("nodejs_npm_install"));
             }
         }
     }
@@ -179,9 +186,9 @@ void NodeJSWorkspaceView::ShowHiddenFiles(bool show)
 
 void NodeJSWorkspaceView::OnShowHiddenFiles(wxCommandEvent& event)
 {
-    NodeJSWorkspaceConfiguration conf;
     const wxFileName& filename = NodeJSWorkspace::Get()->GetFilename();
-    conf.Load(filename).SetShowHiddenFiles(event.IsChecked()).Save(filename);
+    NodeJSWorkspaceConfiguration conf(filename);
+    conf.Load().SetShowHiddenFiles(event.IsChecked()).Save();
     ShowHiddenFiles(event.IsChecked());
     RebuildTree();
 }
@@ -285,10 +292,12 @@ void NodeJSWorkspaceView::OnItemExpanding(wxTreeEvent& event)
     int imageIndex = m_bmpLoader->GetMimeImageId(FileExtManager::TypeProject);
     CHECK_COND_RET(imageIndex != wxNOT_FOUND);
 
+    int imageIndexExpanded = m_bmpLoader->GetMimeImageId(FileExtManager::TypeProjectExpanded);
+
     {
         // change the icon for the parent folder as well
         wxFileName packageJSON(cd->GetPath(), "package.json");
-        if(packageJSON.FileExists()) { GetTreeCtrl()->SetItemImage(item, imageIndex); }
+        if(packageJSON.FileExists()) { GetTreeCtrl()->SetItemImage(item, imageIndex, imageIndexExpanded); }
     }
 
     wxTreeItemIdValue cookie;
@@ -309,13 +318,62 @@ void NodeJSWorkspaceView::OnItemExpanding(wxTreeEvent& event)
 void NodeJSWorkspaceView::OnNpmInit(wxCommandEvent& event)
 {
     wxUnusedVar(event);
-    if(m_terminal.IsRunning()) return;
 
     wxString path;
     wxTreeItemId item;
     if(!GetSelectProjectPath(path, item)) return;
+    clNodeJS::Get().NpmInit(path, this);
+}
 
-    WebToolsConfig conf;
-    conf.Load();
-    m_terminal.ExecuteConsole(conf.GetNpm(), true, "init", path, "npm init");
+void NodeJSWorkspaceView::OnFileSystemUpdated(clFileSystemEvent& event)
+{
+    event.Skip();
+    RefreshTree();
+}
+
+void NodeJSWorkspaceView::OnNpmInstall(wxCommandEvent& event)
+{
+    wxUnusedVar(event);
+    wxTreeItemId item;
+    wxString path;
+    if(!GetSelectProjectPath(path, item)) return;
+
+    wxString packageName = ::wxGetTextFromUser(_("Package name:"), "npm install");
+    if(packageName.IsEmpty()) { return; }
+    clNodeJS::Get().NpmInstall(packageName, path, "--save", this);
+}
+
+void NodeJSWorkspaceView::OnTerminalClosed(clProcessEvent& event)
+{
+    // Refresh the tree after npm commands
+    RefreshTree();
+}
+
+void NodeJSWorkspaceView::OnFindInFilesDismissed(clFindInFilesEvent& event)
+{
+    event.Skip();
+    // Let the parent process this event first (it will handle any transient paths)
+    if(NodeJSWorkspace::Get()->IsOpen()) {
+        // store the find in files mask
+        clConfig::Get().Write("FindInFiles/NodeJS/LookIn", event.GetPaths());
+        clConfig::Get().Write("FindInFiles/NodeJS/Mask", event.GetFileMask());
+    }
+}
+
+void NodeJSWorkspaceView::OnFindInFilesShowing(clFindInFilesEvent& event)
+{
+    event.Skip();
+    clTreeCtrlPanel::OnFindInFilesShowing(event);
+    if(NodeJSWorkspace::Get()->IsOpen()) {
+        // store the find in files mask
+        // Load the NodeJS workspace values from the configuration
+        wxString mask =
+            "*.js;*.html;*.css;*.scss;*.json;*.xml;*.ini;*.md;*.txt;*.text;.htaccess;*.sql";
+        event.SetFileMask(clConfig::Get().Read("FindInFiles/NodeJS/Mask", mask));
+
+        wxString lookIn;
+        lookIn << "<Entire Workspace>\n"
+               << "-*node_modules*";
+        event.SetPaths(clConfig::Get().Read("FindInFiles/NodeJS/LookIn", lookIn));
+    }
 }

@@ -1,5 +1,5 @@
 #include "WebToolsConfig.h"
-#include "json_node.h"
+#include "JSON.h"
 #include "NodeJSLocator.h"
 #include <set>
 #include <algorithm>
@@ -7,14 +7,11 @@
 
 WebToolsConfig::WebToolsConfig()
     : clConfigItem("WebTools")
-    , m_jsFlags(kJSEnableCC | kJSLibraryBrowser | kJSLibraryEcma5 | kJSLibraryEcma6 | kJSPluginNode)
+    , m_jsFlags(kJSEnableCC | kJSLibraryBrowser | kJSLibraryEcma5 | kJSLibraryEcma6 | kJSPluginNode | kJSNodeExpress)
     , m_xmlFlags(kXmlEnableCC)
     , m_htmlFlags(kHtmlEnableCC)
+    , m_nodeOptions(0)
 {
-    NodeJSLocator locator;
-    locator.Locate();
-    m_nodejs = locator.GetNodejs();
-    m_npm = locator.GetNpm();
 }
 
 WebToolsConfig::~WebToolsConfig() {}
@@ -26,37 +23,45 @@ WebToolsConfig& WebToolsConfig::Load()
     return *this;
 }
 
-WebToolsConfig& WebToolsConfig::Save()
+WebToolsConfig& WebToolsConfig::SaveConfig()
 {
     clConfig conf("WebTools.conf");
     conf.WriteItem(this);
     return *this;
 }
 
-void WebToolsConfig::FromJSON(const JSONElement& json)
+void WebToolsConfig::FromJSON(const JSONItem& json)
 {
     m_jsFlags = json.namedObject("m_jsFlags").toSize_t(m_jsFlags);
     m_xmlFlags = json.namedObject("m_xmlFlags").toSize_t(m_xmlFlags);
     m_htmlFlags = json.namedObject("m_htmlFlags").toSize_t(m_htmlFlags);
-    m_nodejs = json.namedObject("m_nodejs").toString(m_nodejs);
-    m_npm = json.namedObject("m_npm").toString(m_npm);
+    m_nodeOptions = json.namedObject("m_nodeOptions").toSize_t(m_nodeOptions);
+    m_portNumber = json.namedObject("m_portNumber").toInt(m_portNumber);
+
+    wxString v;
+    v = json.namedObject("m_nodejs").toString(v);
+    if(!v.IsEmpty() && wxFileName::FileExists(v)) { m_nodejs = v; }
+    v.clear();
+    v = json.namedObject("m_npm").toString(v);
+    if(!v.IsEmpty() && wxFileName::FileExists(v)) { m_npm = v; }
 }
 
-JSONElement WebToolsConfig::ToJSON() const
+JSONItem WebToolsConfig::ToJSON() const
 {
-    JSONElement element = JSONElement::createObject(GetName());
+    JSONItem element = JSONItem::createObject(GetName());
     element.addProperty("m_jsFlags", m_jsFlags);
     element.addProperty("m_xmlFlags", m_xmlFlags);
     element.addProperty("m_htmlFlags", m_htmlFlags);
     element.addProperty("m_nodejs", m_nodejs);
     element.addProperty("m_npm", m_npm);
+    element.addProperty("m_portNumber", m_portNumber);
     return element;
 }
 
 wxString WebToolsConfig::GetTernProjectFile() const
 {
-    JSONRoot root(cJSON_Object);
-    JSONElement libs = JSONElement::createArray("libs");
+    JSON root(cJSON_Object);
+    JSONItem libs = JSONItem::createArray("libs");
     root.toElement().append(libs);
 
     if(m_jsFlags & kJSLibraryBrowser) libs.arrayAppend("browser");
@@ -67,7 +72,7 @@ wxString WebToolsConfig::GetTernProjectFile() const
     if(m_jsFlags & kJSLibraryUnderscore) libs.arrayAppend("underscore");
     if(m_jsFlags & kJSPluginQML) libs.arrayAppend("qml");
 
-    JSONElement plugins = JSONElement::createObject("plugins");
+    JSONItem plugins = JSONItem::createObject("plugins");
     root.toElement().append(plugins);
 
     std::vector<wxString> pluginsToLoad;
@@ -81,21 +86,13 @@ wxString WebToolsConfig::GetTernProjectFile() const
         pluginsToLoad.push_back("node");
     }
 
-    if(m_jsFlags & kJSPluginRequireJS) {
-        pluginsToLoad.push_back("requirejs");
-    }
+    if(m_jsFlags & kJSPluginRequireJS) { pluginsToLoad.push_back("requirejs"); }
 
-    if(m_jsFlags & kJSPluginStrings) {
-        pluginsToLoad.push_back("complete_strings");
-    }
+    if(m_jsFlags & kJSPluginStrings) { pluginsToLoad.push_back("complete_strings"); }
 
-    if(m_jsFlags & kJSPluginAngular) {
-        pluginsToLoad.push_back("angular");
-    }
+    if(m_jsFlags & kJSPluginAngular) { pluginsToLoad.push_back("angular"); }
 
-    if(m_jsFlags & kJSWebPack) {
-        pluginsToLoad.push_back("webpack");
-    }
+    if(m_jsFlags & kJSWebPack) { pluginsToLoad.push_back("webpack"); }
 
     if(m_jsFlags & kJSNodeExpress) {
         pluginsToLoad.push_back("node_resolve");
@@ -107,9 +104,46 @@ wxString WebToolsConfig::GetTernProjectFile() const
     std::for_each(pluginsToLoad.begin(), pluginsToLoad.end(), [&](const wxString& name) {
         if(uniquePlugins.count(name) == 0) {
             uniquePlugins.insert(name);
-            JSONElement node = JSONElement::createObject(name);
+            JSONItem node = JSONItem::createObject(name);
             plugins.append(node);
         }
     });
     return root.toElement().format();
+}
+
+WebToolsConfig& WebToolsConfig::Get()
+{
+    static WebToolsConfig webtoolsConfig;
+    return webtoolsConfig;
+}
+
+bool WebToolsConfig::IsNodeInstalled() const
+{
+    wxFileName fn(GetNodejs());
+    return fn.IsOk() && fn.FileExists();
+}
+
+bool WebToolsConfig::IsNpmInstalled() const
+{
+    wxFileName fn(GetNpm());
+    return fn.IsOk() && fn.FileExists();
+}
+
+wxFileName WebToolsConfig::GetTernScript() const
+{
+    wxFileName fn(GetTempFolder(false), "tern");
+    fn.AppendDir("node_modules");
+    fn.AppendDir("tern");
+    fn.AppendDir("bin");
+    return fn;
+}
+
+bool WebToolsConfig::IsTernInstalled() const { return GetTernScript().FileExists(); }
+
+wxString WebToolsConfig::GetTempFolder(bool create) const
+{
+    wxFileName fn(clStandardPaths::Get().GetUserDataDir(), "");
+    fn.AppendDir("webtools");
+    if(create) { fn.Mkdir(wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL); }
+    return fn.GetPath();
 }
