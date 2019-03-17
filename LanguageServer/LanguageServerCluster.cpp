@@ -9,10 +9,13 @@
 #include "imanager.h"
 #include "file_logger.h"
 #include "wxCodeCompletionBoxManager.h"
+#include "cl_standard_paths.h"
+#include "clWorkspaceManager.h"
 
 LanguageServerCluster::LanguageServerCluster()
 {
     EventNotifier::Get()->Bind(wxEVT_CC_FIND_SYMBOL, &LanguageServerCluster::OnFindSymbold, this);
+    EventNotifier::Get()->Bind(wxEVT_CC_FIND_SYMBOL_DECLARATION, &LanguageServerCluster::OnFindSymbolDecl, this);
     EventNotifier::Get()->Bind(wxEVT_CC_CODE_COMPLETE, &LanguageServerCluster::OnCodeComplete, this);
     Bind(wxEVT_LSP_DEFINITION, &LanguageServerCluster::OnSymbolFound, this);
     Bind(wxEVT_LSP_COMPLETION_READY, &LanguageServerCluster::OnCompletionReady, this);
@@ -23,6 +26,7 @@ LanguageServerCluster::LanguageServerCluster()
 LanguageServerCluster::~LanguageServerCluster()
 {
     EventNotifier::Get()->Unbind(wxEVT_CC_FIND_SYMBOL, &LanguageServerCluster::OnFindSymbold, this);
+    EventNotifier::Get()->Unbind(wxEVT_CC_FIND_SYMBOL_DECLARATION, &LanguageServerCluster::OnFindSymbolDecl, this);
     EventNotifier::Get()->Unbind(wxEVT_CC_CODE_COMPLETE, &LanguageServerCluster::OnCodeComplete, this);
     Unbind(wxEVT_LSP_DEFINITION, &LanguageServerCluster::OnSymbolFound, this);
     Unbind(wxEVT_LSP_COMPLETION_READY, &LanguageServerCluster::OnCompletionReady, this);
@@ -35,7 +39,7 @@ void LanguageServerCluster::Reload()
     for(const std::unordered_map<wxString, LanguageServerProtocol::Ptr_t>::value_type& vt : m_servers) {
         // stop all current processes
         LanguageServerProtocol::Ptr_t server = vt.second;
-        if(server->IsRunning()) { server->Stop(true); }
+        server.reset(nullptr);
     }
     m_servers.clear();
 
@@ -142,7 +146,8 @@ void LanguageServerCluster::RestartServer(const wxString& name)
     LanguageServerProtocol::Ptr_t server = GetServerByName(name);
     if(!server) { return; }
     clDEBUG() << "Restarting LSP server:" << name;
-    server->Stop(true);
+    server->Stop();
+    server->Start();
 
     // Remove the old instance
     m_servers.erase(name);
@@ -157,11 +162,58 @@ void LanguageServerCluster::StartServer(const LanguageServerEntry& entry)
 {
     if(entry.IsEnabled()) {
         LanguageServerProtocol::Ptr_t lsp(new LanguageServerProtocol(entry.GetName(), this));
-        wxString command = entry.GetExepath();
-        ::WrapWithQuotes(command);
-        if(!entry.GetArgs().IsEmpty()) { command << " " << entry.GetArgs(); }
-        lsp->Start(command, entry.GetWorkingDirectory(), entry.GetLanguages());
+
+        wxString lspCommand = entry.GetExepath();
+        ::WrapWithQuotes(lspCommand);
+
+        if(!entry.GetArgs().IsEmpty()) { lspCommand << " " << entry.GetArgs(); }
+
+        wxString helperCommand = LanguageServerConfig::Get().GetNodejs();
+        if(helperCommand.IsEmpty() || !wxFileName::FileExists(helperCommand)) {
+            // TODO : prompt the user to install NodeJS
+            return;
+        }
+
+        ::WrapWithQuotes(helperCommand);
+        wxFileName fnScriptPath(clStandardPaths::Get().GetBinFolder(), "codelite-lsp-helper");
+        wxString scriptPath = fnScriptPath.GetFullPath();
+        ::WrapWithQuotes(scriptPath);
+        helperCommand << " " << scriptPath;
+
+        size_t flags = 0;
+        if(entry.IsShowConsole()) { flags |= LSPStartupInfo::kShowConsole; }
+        wxString rootDir;
+        if(clWorkspaceManager::Get().GetWorkspace()) {
+            rootDir = clWorkspaceManager::Get().GetWorkspace()->GetFileName().GetPath();
+        }
+        clDEBUG() << "Starting lsp:";
+        clDEBUG() << "helperCommand:" << helperCommand;
+        clDEBUG() << "lspCommand:" << lspCommand;
+        clDEBUG() << "entry.GetWorkingDirectory():" << entry.GetWorkingDirectory();
+        clDEBUG() << "rootDir:" << rootDir;
+        clDEBUG() << "entry.GetLanguages():" << entry.GetLanguages();
+
+        lsp->Start(helperCommand, lspCommand, entry.GetWorkingDirectory(), rootDir, entry.GetLanguages(), flags);
         m_servers.insert({ entry.GetName(), lsp });
-        lsp->Bind(wxEVT_LSP_INITIALIZED, &LanguageServerCluster::OnLSPInitialized, this);
+    }
+}
+
+void LanguageServerCluster::OnFindSymbolDecl(clCodeCompletionEvent& event)
+{
+    event.Skip();
+    if(m_servers.empty()) return;
+    if(!LanguageServerConfig::Get().IsEnabled()) { return; }
+
+    IEditor* editor = dynamic_cast<IEditor*>(event.GetEditor());
+    CHECK_PTR_RET(editor);
+
+    wxStyledTextCtrl* ctrl = editor->GetCtrl();
+    int col = ctrl->GetColumn(ctrl->GetCurrentPos());
+    int line = ctrl->LineFromPosition(ctrl->GetCurrentPos());
+    LanguageServerProtocol::Ptr_t server = GetServerForFile(editor->GetFileName());
+    if(server) {
+        // this event is ours to handle
+        event.Skip(false);
+        server->FindDeclaration(editor);
     }
 }

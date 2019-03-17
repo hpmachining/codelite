@@ -529,7 +529,7 @@ BPtoMarker clEditor::GetMarkerForBreakpt(enum BreakpointType bp_type)
 void clEditor::SetCaretAt(long pos)
 {
     DoSetCaretAt(pos);
-    EnsureCaretVisible();
+    CallAfter(&clEditor::EnsureCaretVisible);
 }
 
 /// Setup some scintilla properties
@@ -1162,16 +1162,18 @@ void clEditor::OnCharAdded(wxStyledTextEvent& event)
 
 void clEditor::SetEnsureCaretIsVisible(int pos, bool preserveSelection /*=true*/, bool forceDelay /*=false*/)
 {
-    OptionsConfigPtr opts = EditorConfigST::Get()->GetOptions();
-    if(forceDelay || (opts && opts->GetWordWrap())) {
-        // If the text may be word-wrapped, don't EnsureVisible immediately but from the
-        // paintevent handler, so that scintilla has time to take word-wrap into account
-        m_positionToEnsureVisible = pos;
-        m_preserveSelection = preserveSelection;
-    } else {
-        DoEnsureCaretIsVisible(pos, preserveSelection);
-        m_positionToEnsureVisible = wxNOT_FOUND;
-    }
+    wxUnusedVar(forceDelay);
+    DoEnsureCaretIsVisible(pos, preserveSelection);
+    // OptionsConfigPtr opts = EditorConfigST::Get()->GetOptions();
+    // if(forceDelay || (opts && opts->GetWordWrap())) {
+    //    // If the text may be word-wrapped, don't EnsureVisible immediately but from the
+    //    // paintevent handler, so that scintilla has time to take word-wrap into account
+    //    m_positionToEnsureVisible = pos;
+    //    m_preserveSelection = preserveSelection;
+    //} else {
+    //    DoEnsureCaretIsVisible(pos, preserveSelection);
+    //    m_positionToEnsureVisible = wxNOT_FOUND;
+    //}
 }
 
 void clEditor::OnScnPainted(wxStyledTextEvent& event)
@@ -1563,15 +1565,12 @@ bool clEditor::SaveToFile(const wxFileName& fileName)
 // The write was done to a temporary file, override it
 #ifdef __WXMSW__
     if(!::wxRenameFile(intermediateFile.GetFullPath(), symlinkedFile.GetFullPath(), true)) {
-        bool bSaveSucceeded = false;
         // Check if the file has the ReadOnly attribute and attempt to remove it
         if(MSWRemoveROFileAttribute(symlinkedFile)) {
             if(!::wxRenameFile(intermediateFile.GetFullPath(), symlinkedFile.GetFullPath(), true)) {
                 wxMessageBox(wxString::Format(_("Failed to override read-only file")), "CodeLite",
                              wxOK | wxICON_WARNING);
                 return false;
-            } else {
-                bSaveSucceeded = true;
             }
         }
     }
@@ -4650,7 +4649,9 @@ void clEditor::DoUpdateOptions()
     m_options = EditorConfigST::Get()->GetOptions();
 
     // Now let any local preferences overwrite the global equivalent
-    if(ManagerST::Get()->IsWorkspaceOpen()) { LocalWorkspaceST::Get()->GetOptions(m_options, GetProject()); }
+    if(clCxxWorkspaceST::Get()->IsOpen()) {
+        clCxxWorkspaceST::Get()->GetLocalWorkspace()->GetOptions(m_options, GetProject());
+    }
 
     clEditorConfigEvent event(wxEVT_EDITOR_CONFIG_LOADING);
     event.SetFileName(GetFileName().GetFullPath());

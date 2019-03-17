@@ -277,7 +277,6 @@ void clMakeGeneratorApp::DoGenerateCompileCommands()
 
     Info(wxString() << "-- Generating: " << fn.GetFullPath());
     JSON json(clCxxWorkspaceST::Get()->CreateCompileCommandsJSON());
-
     // Save the file
     json.save(fn);
 }

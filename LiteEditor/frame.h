@@ -56,6 +56,7 @@
 #include <wx/minifram.h>
 #include <wx/infobar.h>
 #include "clInfoBar.h"
+#include "refactorengine.h"
 
 // forward decls
 class DebuggerToolBar;
@@ -213,13 +214,6 @@ public:
      * @param flag
      */
     void SetFrameFlag(bool set, int flag);
-
-    /**
-     * @brief update the tags options data on the disc as well as
-     * the parser thread
-     * @param tod
-     */
-    void UpdateTagsOptions(const TagsOptionsData& tod);
 
     /**
      * @brief return the current tags options data
@@ -523,6 +517,8 @@ protected:
     void OnWebSearchSelectionUI(wxUpdateUIEvent& e);
     void OnThemeChanged(wxCommandEvent& e);
     void OnEnvironmentVariablesModified(clCommandEvent& e);
+    void OnFindReferences(clRefactoringEvent& e);
+    void OnRenameSymbol(clRefactoringEvent& e);
 
     // handle symbol tree events
     void OnParsingThreadMessage(wxCommandEvent& e);

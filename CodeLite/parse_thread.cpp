@@ -42,6 +42,7 @@
 #include <wx/ffile.h>
 #include <wx/stopwatch.h>
 #include <wx/tokenzr.h>
+#include "fileextmanager.h"
 
 #define DEBUG_MESSAGE(x) CL_DEBUG1(x.c_str())
 
@@ -104,6 +105,22 @@ void ParseThread::ProcessRequest(ThreadRequest* request)
 {
     // request is delete by the parent WorkerThread after this method is completed
     ParseRequest* req = (ParseRequest*)request;
+    FileLogger::RegisterThread(wxThread::GetCurrentId(), "C++ Parser Thread");
+    
+    // Filter non C++ files
+    if(!req->_workspaceFiles.empty()) {
+        std::vector<std::string> filtered_list;
+        filtered_list.reserve(req->_workspaceFiles.size());
+        for(std::string& filename : req->_workspaceFiles) {
+            if(FileExtManager::IsCxxFile(wxString() << filename)) { filtered_list.push_back(std::move(filename)); }
+        }
+        req->_workspaceFiles.swap(filtered_list);
+    }
+
+    wxArrayString inc, exc;
+    GetSearchPaths(inc, exc);
+
+    clDEBUG1() << "include paths:\n" << inc;
 
     switch(req->getType()) {
     case ParseRequest::PR_PARSEINCLUDES:
@@ -636,12 +653,9 @@ void ParseThread::ProcessColourRequest(ParseRequest* req)
 {
     CxxTokenizer tokenizer;
     // read the file content
-    wxFFile fp(req->getFile(), "rb");
-    if(fp.IsOpened()) {
+    wxString content;
+    if(FileUtils::ReadFileContent(req->getFile(), content)) {
         wxString flatStrLocals, flatClasses;
-        wxString content;
-        fp.ReadAll(&content);
-        fp.Close();
 
         tokenizer.Reset(content);
 
@@ -665,17 +679,13 @@ void ParseThread::ProcessColourRequest(ParseRequest* req)
         db->OpenDatabase(req->getDbfile());
 
         std::vector<wxString> nonWorkspaceSymbols, workspaceSymbols;
-//        clDEBUG1() << "Parse Thread: removing non workspace symbols" << clEndl;
         db->RemoveNonWorkspaceSymbols(tokensArr, workspaceSymbols, nonWorkspaceSymbols);
-//        clDEBUG1() << "Parse Thread: removing non workspace symbols...done" << clEndl;
 
         // Convert the output to a space delimited array
         std::for_each(workspaceSymbols.begin(), workspaceSymbols.end(),
                       [&](const wxString& token) { flatClasses << token << " "; });
         std::for_each(nonWorkspaceSymbols.begin(), nonWorkspaceSymbols.end(),
                       [&](const wxString& token) { flatStrLocals << token << " "; });
-//        clDEBUG1() << "The following local variables were found:\n" << flatStrLocals << clEndl;
-//        clDEBUG1() << "The following classes were found:\n" << flatClasses << clEndl;
 
         if(req->_evtHandler) {
             clCommandEvent event(wxEVT_PARSE_THREAD_SUGGEST_COLOUR_TOKENS);

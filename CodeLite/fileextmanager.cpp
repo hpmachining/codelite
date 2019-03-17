@@ -30,16 +30,41 @@
 #include <wx/regex.h>
 #include <wx/xml/xml.h>
 
-std::unordered_map<wxString, FileExtManager::FileType> FileExtManager::m_map;
-std::vector<FileExtManager::Matcher::Ptr_t> FileExtManager::m_matchers;
+struct Matcher {
+    SmartPtr<wxRegEx> m_regex;
+    wxString m_exactMatch;
+    FileExtManager::FileType m_fileType;
+
+    Matcher(const wxString& pattern, FileExtManager::FileType fileType, bool regex = true)
+        : m_fileType(fileType)
+    {
+        if(regex) {
+            m_regex = new wxRegEx(pattern, wxRE_ADVANCED | wxRE_ICASE);
+        } else {
+            m_exactMatch = pattern;
+        }
+    }
+
+    bool Matches(const wxString& in) const
+    {
+        if(m_regex) {
+            return m_regex->Matches(in);
+        } else {
+            return in.Find(m_exactMatch) != wxNOT_FOUND;
+        }
+    }
+    typedef SmartPtr<Matcher> Ptr_t;
+};
+
+thread_local std::unordered_map<wxString, FileExtManager::FileType> m_map;
+thread_local std::vector<Matcher::Ptr_t> m_matchers;
 
 void FileExtManager::Init()
 {
-    static bool init_done(false);
-
+    // per thread initialization
+    thread_local bool init_done(false);
     if(!init_done) {
         init_done = true;
-
         m_map[wxT("cc")] = TypeSourceCpp;
         m_map[wxT("cpp")] = TypeSourceCpp;
         m_map[wxT("cxx")] = TypeSourceCpp;
@@ -145,8 +170,14 @@ void FileExtManager::Init()
         m_matchers.push_back(Matcher::Ptr_t(new Matcher("#[ \t]*![ \t]*/usr/bin/bash", TypeScript)));
         m_matchers.push_back(Matcher::Ptr_t(new Matcher("#[ \t]*![ \t]*/bin/python", TypePython)));
         m_matchers.push_back(Matcher::Ptr_t(new Matcher("#[ \t]*![ \t]*/usr/bin/python", TypePython)));
+        m_matchers.push_back(Matcher::Ptr_t(new Matcher("#[ \t]*![ \t]*/bin/node", TypeJS)));
+        m_matchers.push_back(Matcher::Ptr_t(new Matcher("#[ \t]*![ \t]*/usr/bin/node", TypeJS)));
+        m_matchers.push_back(Matcher::Ptr_t(new Matcher("#[ \t]*![ \t]*/bin/nodejs", TypeJS)));
+        m_matchers.push_back(Matcher::Ptr_t(new Matcher("#[ \t]*![ \t]*/usr/bin/nodejs", TypeJS)));
         m_matchers.push_back(Matcher::Ptr_t(new Matcher("<?xml", TypeXml, false)));
         m_matchers.push_back(Matcher::Ptr_t(new Matcher("<?php", TypePhp, false)));
+        m_matchers.push_back(Matcher::Ptr_t(new Matcher("#!/usr/bin/env node", TypeJS, false)));
+        m_matchers.push_back(Matcher::Ptr_t(new Matcher("#!/usr/bin/env nodejs", TypeJS, false)));
         m_matchers.push_back(Matcher::Ptr_t(new Matcher("SQLite format 3", TypeDatabase, false)));
 
         // STL sources places "-*- C++ -*-" at the top of their headers
@@ -182,6 +213,10 @@ FileExtManager::FileType FileExtManager::GetType(const wxString& filename, FileE
             return TypeMakefile;
         } else if(fn.GetFullName().Lower() == "dockerfile") {
             return TypeDockerfile;
+        } else {
+            // try auto detecting
+            FileType autoDetectType = defaultType;
+            if(AutoDetectByContent(filename, autoDetectType)) { return autoDetectType; }
         }
         return defaultType;
     } else if((iter->second == TypeText) && (fn.GetFullName().CmpNoCase("CMakeLists.txt") == 0)) {
@@ -225,10 +260,7 @@ bool FileExtManager::IsCxxFile(const wxString& filename)
 bool FileExtManager::AutoDetectByContent(const wxString& filename, FileExtManager::FileType& fileType)
 {
     wxString fileContent;
-    if(!FileUtils::ReadFileContent(filename, fileContent, wxConvLibc)) return false;
-
-    // Use only the first 4K bytes from the input file (tested with default STL headers)
-    if(fileContent.length() > 4096) { fileContent.Truncate(4096); }
+    if(!FileUtils::ReadBufferFromFile(filename, fileContent, 4096)) { return false; }
 
     for(size_t i = 0; i < m_matchers.size(); ++i) {
         if(m_matchers.at(i)->Matches(fileContent)) {

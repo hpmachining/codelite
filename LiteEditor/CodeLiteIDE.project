@@ -975,8 +975,6 @@
     <File Name="ImportFilesDialogNew.h"/>
     <File Name="ImportFilesDialogNew.cpp"/>
     <File Name="DebuggerSettings_liteeditor_bitmaps.cpp"/>
-    <File Name="FileExplorerTab.h"/>
-    <File Name="FileExplorerTab.cpp"/>
     <File Name="breakpoint_dlg_liteeditor_bitmaps.cpp"/>
     <File Name="breakpointdlgbase.cpp"/>
   </VirtualDirectory>
@@ -1411,7 +1409,7 @@
         <LibraryPath Value="Debug"/>
       </Linker>
       <ResourceCompiler Options="" Required="no"/>
-      <General OutputFile="" IntermediateDirectory="./Debug" Command="/home/eran/root/bin/codelite" CommandArguments="" UseSeparateDebugArgs="no" DebugArguments="--no-plugins" WorkingDirectory="" PauseExecWhenProcTerminates="no" IsGUIProgram="yes" IsEnabled="yes"/>
+      <General OutputFile="" IntermediateDirectory="./Debug" Command="/home/eran/root/bin/codelite" CommandArguments="--with-plugins=LanguageServerPlugin" UseSeparateDebugArgs="yes" DebugArguments="--with-plugins=LanguageServerPlugin" WorkingDirectory="" PauseExecWhenProcTerminates="no" IsGUIProgram="yes" IsEnabled="yes"/>
       <BuildSystem Name="Default"/>
       <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
         <![CDATA[]]>
@@ -1428,7 +1426,7 @@
         <Target Name="cmake">cmake -DPREFIX=/home/eran/root   -DCMAKE_BUILD_TYPE=Debug .. -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCOPY_WX_LIBS=1 -DWITH_WXPATH=/usr/bin/</Target>
         <RebuildCommand>make clean &amp;&amp; make -j8</RebuildCommand>
         <CleanCommand>make clean</CleanCommand>
-        <BuildCommand>make -j8 install</BuildCommand>
+        <BuildCommand>make -j8</BuildCommand>
         <PreprocessFileCommand/>
         <SingleFileCommand/>
         <MakefileGenerationCommand/>

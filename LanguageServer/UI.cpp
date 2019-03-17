@@ -37,18 +37,65 @@ LanguageServerSettingsDlgBase::LanguageServerSettingsDlgBase(wxWindow* parent, w
 
     boxSizer22->Add(0, 0, 1, wxALL, WXC_FROM_DIP(5));
 
-    m_buttonNew = new wxButton(this, wxID_NEW, _("Add..."), wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, -1)), 0);
+    wxFlexGridSizer* flexGridSizer98 = new wxFlexGridSizer(0, 2, 0, 0);
+    flexGridSizer98->SetFlexibleDirection(wxBOTH);
+    flexGridSizer98->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
+    flexGridSizer98->AddGrowableCol(1);
 
-    boxSizer22->Add(m_buttonNew, 0, wxALL | wxALIGN_CENTER_VERTICAL, WXC_FROM_DIP(5));
+    boxSizer2->Add(flexGridSizer98, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+
+    m_staticText100 = new wxStaticText(this, wxID_ANY, _("Nodejs executable:"), wxDefaultPosition,
+                                       wxDLG_UNIT(this, wxSize(-1, -1)), 0);
+    m_staticText100->SetToolTip(_("Set here the path to Nodejs executable.\nCodeLite uses Nodejs to wrap the Language "
+                                  "Servers that are using STDIO for communication."));
+
+    flexGridSizer98->Add(m_staticText100, 0, wxALL | wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL, WXC_FROM_DIP(5));
+
+    m_filePickerNodeJS =
+        new wxFilePickerCtrl(this, wxID_ANY, wxEmptyString, _("Select a file"), wxT("*"), wxDefaultPosition,
+                             wxDLG_UNIT(this, wxSize(-1, -1)), wxFLP_DEFAULT_STYLE | wxFLP_USE_TEXTCTRL | wxFLP_SMALL);
+    m_filePickerNodeJS->SetToolTip(_("Set here the path to Nodejs executable.\nCodeLite uses Nodejs to wrap the "
+                                     "Language Servers that are using STDIO for communication."));
+    m_filePickerNodeJS->SetFocus();
+
+    flexGridSizer98->Add(m_filePickerNodeJS, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+
+    m_staticLine102 =
+        new wxStaticLine(this, wxID_ANY, wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, -1)), wxLI_HORIZONTAL);
+
+    boxSizer2->Add(m_staticLine102, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+
+    m_staticText105 = new wxStaticText(this, wxID_ANY, _("Available Language Servers"), wxDefaultPosition,
+                                       wxDLG_UNIT(this, wxSize(-1, -1)), 0);
+
+    boxSizer2->Add(m_staticText105, 0, wxALL | wxALIGN_CENTER_VERTICAL, WXC_FROM_DIP(5));
+
+    wxBoxSizer* boxSizer106 = new wxBoxSizer(wxHORIZONTAL);
+
+    boxSizer2->Add(boxSizer106, 1, wxEXPAND, WXC_FROM_DIP(5));
 
     m_notebook = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, -1)), wxBK_DEFAULT);
     m_notebook->SetName(wxT("m_notebook"));
 
-    boxSizer2->Add(m_notebook, 1, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+    boxSizer106->Add(m_notebook, 1, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+
+    wxBoxSizer* boxSizer108 = new wxBoxSizer(wxVERTICAL);
+
+    boxSizer106->Add(boxSizer108, 0, wxEXPAND, WXC_FROM_DIP(5));
+
+    m_buttonNew = new wxButton(this, wxID_NEW, _("Add..."), wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, -1)), 0);
+    m_buttonNew->SetToolTip(_("Add new Language Server"));
+
+    boxSizer108->Add(m_buttonNew, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
+
+    m_buttonDelete =
+        new wxButton(this, wxID_DELETE, _("Delete"), wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, -1)), 0);
+
+    boxSizer108->Add(m_buttonDelete, 0, wxALL | wxEXPAND, WXC_FROM_DIP(5));
 
     m_stdBtnSizer4 = new wxStdDialogButtonSizer();
 
-    boxSizer2->Add(m_stdBtnSizer4, 0, wxALL | wxALIGN_CENTER_HORIZONTAL, WXC_FROM_DIP(5));
+    boxSizer2->Add(m_stdBtnSizer4, 0, wxALL | wxALIGN_CENTER_HORIZONTAL, WXC_FROM_DIP(10));
 
     m_button6 = new wxButton(this, wxID_OK, wxT(""), wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, -1)), 0);
     m_button6->SetDefault();
@@ -59,7 +106,7 @@ LanguageServerSettingsDlgBase::LanguageServerSettingsDlgBase(wxWindow* parent, w
     m_stdBtnSizer4->Realize();
 
     SetName(wxT("LanguageServerSettingsDlgBase"));
-    SetSize(wxDLG_UNIT(this, wxSize(400, 300)));
+    SetSize(wxDLG_UNIT(this, wxSize(-1, -1)));
     if(GetSizer()) { GetSizer()->Fit(this); }
     if(GetParent()) {
         CentreOnParent(wxBOTH);
@@ -69,12 +116,20 @@ LanguageServerSettingsDlgBase::LanguageServerSettingsDlgBase(wxWindow* parent, w
     // Connect events
     m_buttonNew->Connect(wxEVT_COMMAND_BUTTON_CLICKED,
                          wxCommandEventHandler(LanguageServerSettingsDlgBase::OnAddServer), NULL, this);
+    m_buttonDelete->Connect(wxEVT_COMMAND_BUTTON_CLICKED,
+                            wxCommandEventHandler(LanguageServerSettingsDlgBase::OnDeleteLSP), NULL, this);
+    m_buttonDelete->Connect(wxEVT_UPDATE_UI, wxUpdateUIEventHandler(LanguageServerSettingsDlgBase::OnDeleteLSPUI), NULL,
+                            this);
 }
 
 LanguageServerSettingsDlgBase::~LanguageServerSettingsDlgBase()
 {
     m_buttonNew->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED,
                             wxCommandEventHandler(LanguageServerSettingsDlgBase::OnAddServer), NULL, this);
+    m_buttonDelete->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED,
+                               wxCommandEventHandler(LanguageServerSettingsDlgBase::OnDeleteLSP), NULL, this);
+    m_buttonDelete->Disconnect(wxEVT_UPDATE_UI, wxUpdateUIEventHandler(LanguageServerSettingsDlgBase::OnDeleteLSPUI),
+                               NULL, this);
 }
 
 LanguageServerPageBase::LanguageServerPageBase(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size,
@@ -90,6 +145,23 @@ LanguageServerPageBase::LanguageServerPageBase(wxWindow* parent, wxWindowID id, 
 
     wxBoxSizer* boxSizer31 = new wxBoxSizer(wxVERTICAL);
     this->SetSizer(boxSizer31);
+
+    wxBoxSizer* boxSizer97 = new wxBoxSizer(wxHORIZONTAL);
+
+    boxSizer31->Add(boxSizer97, 0, wxALL | wxALIGN_RIGHT, WXC_FROM_DIP(5));
+
+    m_checkBoxShowConsole =
+        new wxCheckBox(this, wxID_ANY, _("Show Console"), wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, -1)), 0);
+    m_checkBoxShowConsole->SetValue(false);
+    m_checkBoxShowConsole->SetToolTip(_("Open the LSP server in a console\nUseful for debugging"));
+
+    boxSizer97->Add(m_checkBoxShowConsole, 0, wxALL, WXC_FROM_DIP(5));
+
+    m_checkBoxEnabled =
+        new wxCheckBox(this, wxID_ANY, _("Enabled"), wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, -1)), 0);
+    m_checkBoxEnabled->SetValue(true);
+
+    boxSizer97->Add(m_checkBoxEnabled, 0, wxALL | wxALIGN_RIGHT, WXC_FROM_DIP(5));
 
     wxFlexGridSizer* flexGridSizer432 = new wxFlexGridSizer(0, 2, 0, 0);
     flexGridSizer432->SetFlexibleDirection(wxBOTH);
@@ -155,20 +227,13 @@ LanguageServerPageBase::LanguageServerPageBase(wxWindow* parent, wxWindowID id, 
 
     flexGridSizer432->Add(m_staticText6311, 0, wxALL | wxALIGN_RIGHT, WXC_FROM_DIP(10));
 
-    m_dvListCtrl = new clThemedListCtrl(this, wxID_ANY, wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, 100)),
+    m_dvListCtrl = new clThemedListCtrl(this, wxID_ANY, wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, 150)),
                                         wxDV_ROW_LINES | wxDV_SINGLE);
 
     flexGridSizer432->Add(m_dvListCtrl, 1, wxALL | wxEXPAND, WXC_FROM_DIP(5));
 
-    m_dvListCtrl->AppendTextColumn(_("Language"), wxDATAVIEW_CELL_INERT, WXC_FROM_DIP(-2), wxALIGN_LEFT,
+    m_dvListCtrl->AppendTextColumn(_("Supported Languages"), wxDATAVIEW_CELL_INERT, WXC_FROM_DIP(-2), wxALIGN_LEFT,
                                    wxDATAVIEW_COL_RESIZABLE);
-    flexGridSizer432->Add(0, 0, 1, wxALL, WXC_FROM_DIP(5));
-
-    m_checkBoxEnabled =
-        new wxCheckBox(this, wxID_ANY, _("Enabled"), wxDefaultPosition, wxDLG_UNIT(this, wxSize(-1, -1)), 0);
-    m_checkBoxEnabled->SetValue(true);
-
-    flexGridSizer432->Add(m_checkBoxEnabled, 0, wxALL, WXC_FROM_DIP(5));
 
     SetName(wxT("LanguageServerPageBase"));
     SetSize(wxDLG_UNIT(this, wxSize(-1, -1)));

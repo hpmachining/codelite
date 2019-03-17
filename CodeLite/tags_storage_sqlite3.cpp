@@ -79,7 +79,7 @@ void TagsStorageSQLite::OpenDatabase(const wxFileName& fileName)
         }
 
     } catch(wxSQLite3Exception& e) {
-        wxUnusedVar(e);
+        clWARNING() << "Failed to open file:" << m_fileName.GetFullPath() << "." << e.GetMessage();
     }
 }
 
@@ -91,7 +91,7 @@ void TagsStorageSQLite::CreateSchema()
     // (this needs to be done before the creation of the
     // tables and indices)
     try {
-        sql = wxT("PRAGMA journal_mode= OFF;");
+        sql = wxT("PRAGMA journal_mode= WAL;");
         m_db->ExecuteUpdate(sql);
 
         sql = wxT("PRAGMA synchronous = OFF;");
@@ -99,7 +99,7 @@ void TagsStorageSQLite::CreateSchema()
 
         sql = wxT("PRAGMA temp_store = MEMORY;");
         m_db->ExecuteUpdate(sql);
-        
+
         sql = wxT("create  table if not exists tags (ID INTEGER PRIMARY KEY AUTOINCREMENT, name string, file string, "
                   "line integer, kind string, access string, signature string, pattern string, parent string, inherits "
                   "string, path string, typeref string, scope string, return_value string);");
@@ -328,31 +328,27 @@ void TagsStorageSQLite::DeleteByFileName(const wxFileName& path, const wxString&
     try {
         OpenDatabase(path);
 
-        if(autoCommit) m_db->Begin();
+        if(autoCommit) { m_db->Begin(); }
 
-        wxString sql = wxString::Format(wxT("Delete from tags where File='%s'"), fileName.GetData());
-        //#ifdef __WXMSW__
-        //        sql << " COLLATE NOCASE ";
-        //#endif
-        CL_DEBUG("TagsStorageSQLite: DeleteByFileName: '%s'", sql);
+        wxString sql;
+        sql << "delete from tags where File='" << fileName << "'";
         m_db->ExecuteUpdate(sql);
 
         if(autoCommit) m_db->Commit();
     } catch(wxSQLite3Exception& e) {
         wxUnusedVar(e);
-        if(autoCommit) m_db->Rollback();
+        if(autoCommit) { m_db->Rollback(); }
     }
 }
 
 wxSQLite3ResultSet TagsStorageSQLite::Query(const wxString& sql, const wxFileName& path)
 {
     // make sure database is open
-
     try {
         OpenDatabase(path);
         return m_db->ExecuteQuery(sql);
     } catch(wxSQLite3Exception& e) {
-        wxUnusedVar(e);
+        clWARNING() << "Query error:" << sql << "." << e.GetMessage();
     }
     return wxSQLite3ResultSet();
 }
@@ -362,7 +358,7 @@ void TagsStorageSQLite::ExecuteUpdate(const wxString& sql)
     try {
         m_db->ExecuteUpdate(sql);
     } catch(wxSQLite3Exception& e) {
-        wxUnusedVar(e);
+        clWARNING() << "ExecuteUpdate error:" << sql << "." << e.GetMessage();
     }
 }
 
@@ -471,8 +467,10 @@ void TagsStorageSQLite::GetFiles(std::vector<FileEntryPtr>& files)
         wxString query(wxT("select * from files order by file"));
         wxSQLite3ResultSet res = m_db->ExecuteQuery(query);
 
-        while(res.NextRow()) {
+        // Pre allocate a reasonable amount of entries
+        files.reserve(5000);
 
+        while(res.NextRow()) {
             FileEntryPtr fe(new FileEntry());
             fe->SetId(res.GetInt(0));
             fe->SetFile(res.GetString(1));
@@ -480,6 +478,8 @@ void TagsStorageSQLite::GetFiles(std::vector<FileEntryPtr>& files)
 
             files.push_back(fe);
         }
+        // release unneeded memory
+        files.shrink_to_fit();
 
     } catch(wxSQLite3Exception& e) {
         wxUnusedVar(e);
@@ -1355,7 +1355,7 @@ void TagsStorageSQLiteCache::Store(const wxString& sql, const std::vector<TagEnt
 
 void TagsStorageSQLiteCache::Clear()
 {
-    //CL_DEBUG1(wxT("[CACHE CLEARED]"));
+    // CL_DEBUG1(wxT("[CACHE CLEARED]"));
     m_cache.clear();
 }
 

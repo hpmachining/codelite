@@ -5,17 +5,21 @@
 #include "asyncprocess.h"
 #include "cl_command_event.h"
 #include <wx/filename.h>
+#include <wx/process.h>
+#include "codelite_exports.h"
 
-class CompileCommandsGenerator : public wxEvtHandler
+wxDECLARE_EXPORTED_EVENT(WXDLLIMPEXP_SDK, wxEVT_COMPILE_COMMANDS_JSON_GENERATED, clCommandEvent);
+
+class WXDLLIMPEXP_SDK CompileCommandsGenerator : public wxEvtHandler
 {
-    IProcess* m_process = nullptr;
+    wxProcess* m_process = nullptr;
     wxFileName m_outputFile;
-
+    
 protected:
-    void OnProcessOutput(clProcessEvent& event);
-    void OnProcessTeraminated(clProcessEvent& event);
+    void OnProcessTeraminated(wxProcessEvent& event);
 
 public:
+    typedef wxSharedPtr<CompileCommandsGenerator> Ptr_t;
     CompileCommandsGenerator();
     virtual ~CompileCommandsGenerator();
 

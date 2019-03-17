@@ -1,0 +1,186 @@
+#!/usr/bin/env node
+
+//===--------------------------------------------------------------------------------
+// Copyright: Eran Ifrah
+// This scripts attempts to launch LSP server(s)
+// and pass the communication with them over socket
+// to CodeLite
+//===--------------------------------------------------------------------------------
+let net = require('net');
+const { spawn } = require('child_process');
+
+///===-------------------------------------------------------------------------------
+/// Message
+///===-------------------------------------------------------------------------------
+class Message
+{
+    constructor()
+    {
+        this.content = "";
+        this.headersMap = new Map()
+    }
+
+    /**
+     * read header from the buffer
+     */
+
+    getContentLength()
+    {
+        if(this.headersMap.has("content-length")) {
+           return parseInt(this.headersMap.get("content-length"));
+        }
+        return -1;
+    }
+
+    parse(buffer)
+    {
+        let str = Buffer.isBuffer(buffer) ?  buffer.toString() : buffer;
+        let where = str.indexOf("\r\n\r\n");
+        if(where != -1) {
+            this.content = str.substr(where + 4);
+            let headers = str.substr(0, where).split("\r\n");
+            this.headersMap.clear();
+            headers.forEach(function(v) {
+                let pair = v.split(":");
+                if(pair.length == 2) { 
+                    let key = pair[0].trim().toLowerCase();
+                    let val = pair[1].trim().toLowerCase();
+                    this.headersMap.set(key, val);
+                }
+            }.bind(this));
+        }
+        let contentLen = this.getContentLength();
+        if((contentLen == -1) || (contentLen > this.content.length)) { return undefined; }
+        let messageBuffer = this.content.substr(0, contentLen);
+        let remainder = this.content.substr(contentLen);
+        
+        try {
+            let requestObject = JSON.parse(messageBuffer);
+            return { request: requestObject, remainder: remainder };
+        } catch (e) {
+            return undefined;
+        }
+    }
+}
+
+///===---------------------------------------------------------------------------------------------
+///===---------------------------------------------------------------------------------------------
+///===---------------------------------------------------------------------------------------------
+
+/**
+ * attempt to consume a single message from the incoming buffer
+ * @param conn socket on which the data received
+ */
+function tryProcessMessage(conn)
+{
+    if(conn.incoming_buffer.length > 0) {
+        let message = new Message();
+        let command = message.parse(conn.incoming_buffer);
+        if(command == undefined) { 
+            console.log("<<< Message is incomplete. incoming_buffer: " +  conn.incoming_buffer.length);
+            return false;
+        }
+        conn.incoming_buffer = command.remainder;
+        console.log(`<<< Message is complete. incoming_buffer: ${conn.incoming_buffer.length}`);
+        processCommand(command.request, conn);
+        return true;
+    }
+    return false;
+}
+
+/**
+ * start LSP server and associate it with the TCP connection
+ */
+function processCommand(command, conn)
+{
+    switch(command.method) {
+    case 'execute':
+        // The 'execute' is a special command that we handle it ourself
+        let lsp = {}
+        try {
+            console.log("program: " + command.command);
+            console.log("cwd: " + command.wd);
+            console.log("args:" + command.args);
+            lsp = spawn(command.command, command.args, {cwd : command.wd});
+            
+        } catch(e) {
+            console.log(e.message);
+            return;
+        }
+        
+        if(lsp != undefined) {
+            conn.lsp_process = lsp;
+            lsp.stdout.on('data', (data) => {
+                console.log("LSP\n" + data.toString());
+                conn.write(data.toString()); // pass the data as-is back to CodeLite
+                // Now that we got a reply from the LSP, try to process the next message
+                tryProcessMessage(conn);
+            });
+            lsp.stderr.on('data', (data) => {
+                console.error("LSP\n" + data.toString());
+                // Now that we got a reply from the LSP, try to process the next message
+                tryProcessMessage(conn);
+            });
+            lsp.on('close', (code) => {
+               // Close the tcp connection
+               process.exit(0);
+            });
+        }
+    break;
+    default:
+        if(conn.lsp_process != undefined) {
+            let asString = JSON.stringify(command);
+            let jsonMessage = "Content-Length: " + asString.length + "\r\n\r\n" + asString; 
+            conn.lsp_process.stdin.write(jsonMessage);
+        }
+    break;
+    }
+}
+
+/**
+ * this callback will get called when data arrives on the socket
+ * @param data string|buffer
+ * @this the connection (socket)
+ */
+function onDataRead(data)
+{
+    if(!this.hasOwnProperty('incoming_buffer')) { this['incoming_buffer'] = ""; }
+
+    // Add the buffer to the connections' buffer storage
+    let bufferRead = typeof data == "string" ? data : data.toString();
+    this.incoming_buffer += bufferRead;
+    
+    // Try processing the buffer
+    tryProcessMessage(this);
+}
+
+//===--------------------------------------------------------------------------------
+// Main
+//===--------------------------------------------------------------------------------
+
+
+function connectToCodeLite()
+{
+    let socket = net.Socket();
+    
+    // Make the server TCP/IP server on port 12898
+    let port = (process.argv.length > 2) ? process.argv[2] : 12898;
+    socket.connect(port, "127.0.0.1", function() {
+        console.log(`Successfully connected to tcp://127.0.0.1:${port}`);
+    });
+    socket.on('error', (code) => {
+        console.log(`Unable to connect to CodeLite. ${code}`);
+        process.exit(1);
+    });
+    socket.on('data', onDataRead.bind(socket));
+    socket.on('close', (code) => {
+        // if CodeLite termianted, exit
+        console.log(`close event ${code}`);
+        process.exit(0);
+    });
+}
+connectToCodeLite();
+
+//process.on('uncaughtException', err => {
+//    process.stdin.read(1);
+//});

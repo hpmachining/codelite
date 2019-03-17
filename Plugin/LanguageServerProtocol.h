@@ -13,6 +13,8 @@
 #include <string>
 #include "LSP/RequestMessage.h"
 #include <unordered_map>
+#include "SocketAPI/clSocketClientAsync.h"
+#include "LSPNetwork.h"
 
 class IEditor;
 class WXDLLIMPEXP_SDK LSPRequestMessageQueue
@@ -24,7 +26,7 @@ class WXDLLIMPEXP_SDK LSPRequestMessageQueue
 public:
     LSPRequestMessageQueue() {}
     virtual ~LSPRequestMessageQueue() {}
-    
+
     LSP::RequestMessage::Ptr_t TakePendingReplyMessage(int msgid);
     void Push(LSP::RequestMessage::Ptr_t message);
     void Pop();
@@ -44,14 +46,14 @@ class WXDLLIMPEXP_SDK LanguageServerProtocol : public wxEvtHandler
 
     wxString m_name;
     wxEvtHandler* m_owner = nullptr;
-    IProcess* m_process = nullptr;
-    wxString m_command;
-    wxString m_workingDirectory;
-    bool m_goingDown = false;
+    LSPNetwork::Ptr_t m_network;
+    wxString m_lspCommand;
+    wxString m_lspCommandWorkingDirectory;
     wxStringSet_t m_filesSent;
     wxStringSet_t m_languages;
     wxString m_outputBuffer;
-    wxString m_workspaceFolder;
+    wxString m_rootFolder;
+    wxString m_helperCommand;
 
     // initialization
     eState m_state = kUnInitialized;
@@ -59,19 +61,21 @@ class WXDLLIMPEXP_SDK LanguageServerProtocol : public wxEvtHandler
 
     // Parsing queue
     LSPRequestMessageQueue m_Queue;
+    size_t m_createFlags = 0;
 
 public:
     typedef wxSharedPtr<LanguageServerProtocol> Ptr_t;
 
 protected:
-    void OnProcessTerminated(clProcessEvent& event);
-    void OnProcessOutput(clProcessEvent& event);
-    void OnProcessStderr(clProcessEvent& event);
+    void OnNetConnected(clCommandEvent& event);
+    void OnNetError(clCommandEvent& event);
+    void OnNetDataReady(clCommandEvent& event);
+
     void OnFileLoaded(clCommandEvent& event);
     void OnFileClosed(clCommandEvent& event);
     void OnFileSaved(clCommandEvent& event);
-    void OnWorkspaceLoaded(wxCommandEvent& event);
     void OnWorkspaceClosed(wxCommandEvent& event);
+    void OnWorkspaceOpen(wxCommandEvent& event);
 
 protected:
     void DoClear();
@@ -135,9 +139,19 @@ public:
     bool CanHandle(const wxFileName& filename) const;
 
     /**
-     * @brief start a server for an executable
+     * @brief start LSP server and connect to it (e.g. clangd)
+     * @param helperCommand path to helper script (nodejs script) that does the actual launching of the LSP server
+     * @param lspCommand LSP server command
+     * @param rootFolder the LSP root folder (to be passed during the 'initialize' request)
+     * @param languages supported languages by this LSP
      */
-    void Start(const wxString& command, const wxString& workingDirectory, const wxArrayString& languages);
+    void Start(const wxString& helperCommand, const wxString& lspCommand, const wxString& lspCommandWorkingDirectory,
+               const wxString& rootFolder, const wxArrayString& languages, size_t flags);
+
+    /**
+     * @brief same as above, but reuse the current parameters
+     */
+    void Start();
 
     /**
      * @brief is the LSP running?
@@ -147,17 +161,16 @@ public:
     /**
      * @brief stop the language server
      */
-    void Stop(bool goingDown);
-
-    /**
-     * @brief restart the server. If the server is not running, start it
-     */
-    void Restart();
+    void Stop();
 
     /**
      * @brief find the definition of the item at the caret position
      */
     void FindDefinition(IEditor* editor);
+    /**
+     * @brief find the definition of the item at the caret position
+     */
+    void FindDeclaration(IEditor* editor);
 
     /**
      * @brief perform code completion for a given editor
@@ -168,7 +181,7 @@ public:
      * @brief manually load file into the server
      */
     void OpenEditor(IEditor* editor);
-    
+
     /**
      * @brief tell the server to close editor
      */

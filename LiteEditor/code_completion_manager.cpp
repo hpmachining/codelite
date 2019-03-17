@@ -47,7 +47,6 @@
 #include "wxCodeCompletionBoxManager.h"
 #include <algorithm>
 #include "manager.h"
-#include "CompileCommandsCreateor.h"
 
 static CodeCompletionManager* ms_CodeCompletionManager = NULL;
 
@@ -73,8 +72,6 @@ CodeCompletionManager::CodeCompletionManager()
     , m_wordCompletionRefreshNeeded(false)
     , m_buildInProgress(false)
 {
-    EventNotifier::Get()->Connect(wxEVT_BUILD_ENDED, clBuildEventHandler(CodeCompletionManager::OnBuildEnded), NULL,
-                                  this);
     EventNotifier::Get()->Connect(wxEVT_BUILD_STARTED, clBuildEventHandler(CodeCompletionManager::OnBuildStarted), NULL,
                                   this);
     EventNotifier::Get()->Bind(wxEVT_COMPILE_COMMANDS_JSON_GENERATED,
@@ -98,22 +95,28 @@ CodeCompletionManager::CodeCompletionManager()
                                this);
     EventNotifier::Get()->Bind(wxEVT_CC_BLOCK_COMMENT_WORD_COMPLETE, &CodeCompletionManager::OnBlockCommentWordComplete,
                                this);
+    EventNotifier::Get()->Bind(wxEVT_BUILD_ENDED, &CodeCompletionManager::OnBuildEnded, this);
+    EventNotifier::Get()->Bind(wxEVT_PROJ_FILE_ADDED, &CodeCompletionManager::OnFilesAdded, this);
+    EventNotifier::Get()->Bind(wxEVT_WORKSPACE_LOADED, &CodeCompletionManager::OnWorkspaceLoaded, this);
+
     // Start the worker threads
     m_preProcessorThread.Start();
     m_usingNamespaceThread.Start();
+    m_compileCommandsGenerator.reset(new CompileCommandsGenerator());
 }
 
 CodeCompletionManager::~CodeCompletionManager()
 {
     m_preProcessorThread.Stop();
     m_usingNamespaceThread.Stop();
+    EventNotifier::Get()->Unbind(wxEVT_PROJ_FILE_ADDED, &CodeCompletionManager::OnFilesAdded, this);
+    EventNotifier::Get()->Unbind(wxEVT_WORKSPACE_LOADED, &CodeCompletionManager::OnWorkspaceLoaded, this);
     EventNotifier::Get()->Unbind(wxEVT_CC_BLOCK_COMMENT_CODE_COMPLETE,
                                  &CodeCompletionManager::OnBlockCommentCodeComplete, this);
     EventNotifier::Get()->Unbind(wxEVT_CC_BLOCK_COMMENT_WORD_COMPLETE,
                                  &CodeCompletionManager::OnBlockCommentWordComplete, this);
 
-    EventNotifier::Get()->Disconnect(wxEVT_BUILD_ENDED, clBuildEventHandler(CodeCompletionManager::OnBuildEnded), NULL,
-                                     this);
+    EventNotifier::Get()->Unbind(wxEVT_BUILD_ENDED, &CodeCompletionManager::OnBuildEnded, this);
     EventNotifier::Get()->Disconnect(wxEVT_BUILD_STARTED, clBuildEventHandler(CodeCompletionManager::OnBuildStarted),
                                      NULL, this);
     EventNotifier::Get()->Unbind(wxEVT_COMPILE_COMMANDS_JSON_GENERATED,
@@ -267,6 +270,12 @@ void CodeCompletionManager::GotoImpl(clEditor* editor)
 {
     DoUpdateOptions();
     bool res = false;
+
+    // Let the plugins handle this first
+    clCodeCompletionEvent event(wxEVT_CC_FIND_SYMBOL);
+    event.SetEditor(editor);
+    if(EventNotifier::Get()->ProcessEvent(event)) { return; }
+
     if(GetOptions() & CC_CTAGS_ENABLED) { res = DoCtagsGotoImpl(editor); }
     if(!res && (GetOptions() & CC_CLANG_ENABLED)) { DoClangGotoImpl(editor); }
 }
@@ -313,6 +322,13 @@ void CodeCompletionManager::GotoDecl(clEditor* editor)
     DoUpdateOptions();
     bool res = false;
 
+    // Let the plugins handle this first
+    // NOTE: we send here the event 'wxEVT_CC_FIND_SYMBOL' and not 'wxEVT_CC_FIND_SYMBOL_DECLARATION'
+    // becuase clangd does not support this method yet...
+    clCodeCompletionEvent event(wxEVT_CC_FIND_SYMBOL);
+    event.SetEditor(editor);
+    if(EventNotifier::Get()->ProcessEvent(event)) { return; }
+
     if(GetOptions() & CC_CTAGS_ENABLED) { res = DoCtagsGotoDecl(editor); }
 
     if(!res && (GetOptions() & CC_CLANG_ENABLED)) { DoClangGotoDecl(editor); }
@@ -321,16 +337,8 @@ void CodeCompletionManager::GotoDecl(clEditor* editor)
 void CodeCompletionManager::OnBuildEnded(clBuildEvent& e)
 {
     e.Skip();
-    DoUpdateCompilationDatabase();
-    DoProcessCompileCommands();
+    m_compileCommandsGenerator->GenerateCompileCommands();
     m_buildInProgress = false;
-}
-
-void CodeCompletionManager::DoUpdateCompilationDatabase()
-{
-    // Create a worker thread (detached thread) that
-    // will initialize the database now that the compilation has ended
-    ManagerST::Get()->GenerateCompileCommands();
 }
 
 void CodeCompletionManager::OnAppActivated(wxActivateEvent& e) { e.Skip(); }
@@ -347,6 +355,7 @@ void CodeCompletionManager::OnCompileCommandsFileGenerated(clCommandEvent& event
 {
     event.Skip();
     clDEBUG() << "-- Code Completion Manager: process file" << event.GetFileName();
+    this->CompileCommandsFileProcessed(event.GetStrings());
     clMainFrame::Get()->SetStatusText("Ready");
 }
 
@@ -638,4 +647,16 @@ size_t CodeCompletionManager::CreateBlockCommentKeywordsList(wxCodeCompletionBox
 void CodeCompletionManager::UpdateParserPaths()
 {
     if(clCxxWorkspaceST::Get()->IsOpen()) { DoProcessCompileCommands(); }
+}
+
+void CodeCompletionManager::OnFilesAdded(clCommandEvent& e)
+{
+    e.Skip();
+    m_compileCommandsGenerator->GenerateCompileCommands();
+}
+
+void CodeCompletionManager::OnWorkspaceLoaded(wxCommandEvent& e)
+{
+    e.Skip();
+    m_compileCommandsGenerator->GenerateCompileCommands();
 }

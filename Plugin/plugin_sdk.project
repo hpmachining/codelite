@@ -2,7 +2,7 @@
 <CodeLite_Project Name="plugin_sdk" Version="10.0.0">
   <Plugins>
     <Plugin Name="qmake">
-      <![CDATA[00060001N0015WinDebugUnicode0000000000000001N0011WinDebug_290000000000000001N0017WinReleaseUnicode0000000000000001N0013WinRelease_290000000000000001N0013Win_x64_Debug0000000000000001N0015Win_x64_Release000000000000]]>
+      <![CDATA[00070001N0011CMake_Debug0000000000000001N0015WinDebugUnicode0000000000000001N0011WinDebug_290000000000000001N0017WinReleaseUnicode0000000000000001N0013WinRelease_290000000000000001N0013Win_x64_Debug0000000000000001N0015Win_x64_Release000000000000]]>
     </Plugin>
     <Plugin Name="CMakePlugin">
       <![CDATA[[{
@@ -45,6 +45,12 @@
     </Plugin>
   </Plugins>
   <VirtualDirectory Name="LanguageServerProtocol">
+    <File Name="LSPStartupInfo.cpp"/>
+    <File Name="LSPStartupInfo.h"/>
+    <File Name="LSPNetworkSocket.cpp"/>
+    <File Name="LSPNetworkSocket.h"/>
+    <File Name="LSPNetwork.cpp"/>
+    <File Name="LSPNetwork.h"/>
     <File Name="LanguageServerProtocol.h"/>
     <File Name="LanguageServerProtocol.cpp"/>
   </VirtualDirectory>
@@ -133,6 +139,16 @@
     <Topleveldir>/src/codelite/Plugin</Topleveldir>
   </Reconciliation>
   <VirtualDirectory Name="src">
+    <VirtualDirectory Name="clangd">
+      <File Name="CompileFlagsTxt.cpp"/>
+      <File Name="CompileFlagsTxt.h"/>
+      <File Name="CompileCommandsJSON.cpp"/>
+      <File Name="CompileCommandsJSON.h"/>
+      <File Name="CompileCommandsGenerator.h"/>
+      <File Name="CompileCommandsGenerator.cpp"/>
+      <File Name="compilation_database.h"/>
+      <File Name="compilation_database.cpp"/>
+    </VirtualDirectory>
     <File Name="clSystemSettings.cpp"/>
     <File Name="clSystemSettings.h"/>
     <File Name="async_executable_cmd.cpp"/>
@@ -157,8 +173,6 @@
     <File Name="localworkspace.h"/>
     <File Name="localworkspace.cpp"/>
     <File Name="shell_command.cpp"/>
-    <File Name="compilation_database.h"/>
-    <File Name="compilation_database.cpp"/>
     <File Name="Markup.cpp"/>
     <File Name="Markup.h"/>
     <File Name="VirtualDirectorySelectorDlg.h"/>
@@ -167,8 +181,6 @@
     <File Name="bookmark_manager.cpp"/>
     <File Name="unredobase.cpp"/>
     <File Name="unredobase.h"/>
-    <File Name="CompileCommandsCreateor.h"/>
-    <File Name="CompileCommandsCreateor.cpp"/>
     <File Name="ColoursAndFontsManager.h"/>
     <File Name="ColoursAndFontsManager.cpp"/>
     <VirtualDirectory Name="EclipseImporters">
@@ -772,6 +784,49 @@
       </Linker>
       <ResourceCompiler Options=""/>
     </GlobalSettings>
+    <Configuration Name="CMake_Debug" CompilerType="gnu gcc" DebuggerType="GNU gdb debugger" Type="Executable" BuildCmpWithGlobalSettings="append" BuildLnkWithGlobalSettings="append" BuildResWithGlobalSettings="append">
+      <Compiler Options="-g -Wall" C_Options="" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0">
+        <IncludePath Value="."/>
+      </Compiler>
+      <Linker Options="-O0" Required="yes">
+        <LibraryPath Value="."/>
+        <LibraryPath Value="Debug"/>
+      </Linker>
+      <ResourceCompiler Options="" Required="no"/>
+      <General OutputFile="" IntermediateDirectory="./Debug" Command="" CommandArguments="" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="./Debug" PauseExecWhenProcTerminates="no" IsGUIProgram="no" IsEnabled="yes"/>
+      <BuildSystem Name="Default"/>
+      <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
+        <![CDATA[]]>
+      </Environment>
+      <Debugger IsRemote="no" RemoteHostName="" RemoteHostPort="" DebuggerPath="" IsExtended="no">
+        <DebuggerSearchPaths/>
+        <PostConnectCommands/>
+        <StartupCommands/>
+      </Debugger>
+      <PreBuild/>
+      <PostBuild/>
+      <CustomBuild Enabled="yes">
+        <Target Name="install">make -j8 install</Target>
+        <RebuildCommand>make clean &amp;&amp; make -j8</RebuildCommand>
+        <CleanCommand>make clean</CleanCommand>
+        <BuildCommand>make -j8</BuildCommand>
+        <PreprocessFileCommand/>
+        <SingleFileCommand/>
+        <MakefileGenerationCommand/>
+        <ThirdPartyToolName/>
+        <WorkingDirectory>$(WorkspacePath)/build-debug/Plugin</WorkingDirectory>
+      </CustomBuild>
+      <AdditionalRules>
+        <CustomPostBuild/>
+        <CustomPreBuild/>
+      </AdditionalRules>
+      <Completion EnableCpp11="no" EnableCpp14="no">
+        <ClangCmpFlagsC/>
+        <ClangCmpFlags/>
+        <ClangPP/>
+        <SearchPaths/>
+      </Completion>
+    </Configuration>
     <Configuration Name="Custom" CompilerType="g++-64" DebuggerType="GNU gdb debugger" Type="Executable" BuildCmpWithGlobalSettings="append" BuildLnkWithGlobalSettings="append" BuildResWithGlobalSettings="append">
       <Compiler Options="-g -Wall" C_Options="" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0">
         <IncludePath Value="."/>
@@ -875,6 +930,7 @@
         <IncludePath Value="../Interfaces"/>
         <IncludePath Value="../sdk/libssh/include"/>
         <Preprocessor Value="USE_SFTP=1"/>
+        <Preprocessor Value="CL_DEBUG_BUILD=1"/>
       </Compiler>
       <Linker Options="$(shell wx-config --libs std,stc,ribbon,propgrid  --unicode=yes)" Required="yes">
         <LibraryPath Value="../lib/gcc_lib"/>
